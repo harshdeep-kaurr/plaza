@@ -495,37 +495,31 @@ function SubPlaza() {
                     borderColor: m.side === "left" ? biasShading.borderColor : "#e6e4e0"
                   }}
                 >
-                  <div className="font-bold mb-1 group relative cursor-pointer">
+                  <div 
+                    className="font-bold mb-1 cursor-pointer transition-colors duration-200 hover:text-blue-600"
+                    title={m.news_source ? `News Source: ${m.news_source}${(m.news_source_url || m.source_url) ? ' (Click to read article)' : ''}` : ''}
+                    onMouseEnter={(e) => {
+                      if (m.news_source) {
+                        e.target.textContent = m.news_source;
+                        e.target.style.textDecoration = 'underline';
+                        e.target.dataset.showingSource = 'true';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.textContent = m.speaker;
+                      e.target.style.textDecoration = 'none';
+                      e.target.dataset.showingSource = 'false';
+                    }}
+                    onClick={(e) => {
+                      const url = m.news_source_url || m.source_url;
+                      const isShowingSource = e.target.dataset.showingSource === 'true';
+                      
+                      if (url && isShowingSource) {
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                      }
+                    }}
+                  >
                     {m.speaker}
-                    {(m.news_source || m.source_url) && (
-                      <div className="absolute bottom-full left-0 mb-2 w-80 bg-white border border-gray-300 rounded-lg shadow-lg p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
-                        <div className="text-sm font-semibold text-gray-800 mb-2">
-                          {m.news_source || m.speaker}
-                        </div>
-                        {m.news_source_url && (
-                          <div className="text-xs text-gray-600 mb-2">
-                            <a 
-                              href={m.news_source_url} 
-                              target="_blank" 
-                              rel="noreferrer"
-                              className="text-blue-600 hover:text-blue-800 underline"
-                            >
-                              {m.news_source_url}
-                            </a>
-                          </div>
-                        )}
-                        {m.quote && (
-                          <div className="text-xs text-gray-700 italic border-l-2 border-gray-300 pl-2">
-                            "{m.quote}"
-                          </div>
-                        )}
-                        {!m.quote && m.news_source && (
-                          <div className="text-xs text-gray-500 italic">
-                            News source: {m.news_source}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                   <p className="text-[color:var(--ink-light)]">{m.text}</p>
                 </div>

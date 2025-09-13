@@ -425,15 +425,15 @@ def clean_json_string(json_str):
     # Remove control characters that break JSON parsing
     json_str = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', json_str)
     
-    # Replace unescaped newlines, tabs, and carriage returns
-    json_str = json_str.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
-    
     # Fix common JSON issues
     json_str = re.sub(r',\s*\]', ']', json_str)  # Remove trailing commas before ]
     json_str = re.sub(r',\s*}', '}', json_str)   # Remove trailing commas before }
     
-    # Fix unescaped quotes in string values
-    json_str = re.sub(r'"text":\s*"([^"]*)"([^"]*)"([^"]*)"', r'"text": "\1\2\3"', json_str)
+    # Fix incomplete JSON by adding missing closing brackets
+    if json_str.count('[') > json_str.count(']'):
+        json_str += ']'
+    if json_str.count('{') > json_str.count('}'):
+        json_str += '}'
     
     return json_str
 
@@ -587,8 +587,13 @@ Return ONLY the JSON array, no other text.
                 try:
                     # Look for individual message objects in the response with more flexible patterns
                     message_patterns = [
+                        # Pattern for complete message objects with URLs and quotes
+                        r'\{"speaker":\s*"([^"]+)",\s*"side":\s*"([^"]+)",\s*"text":\s*"([^"]+)",\s*"timestamp":\s*"([^"]+)",\s*"source_url":\s*"([^"]*)",\s*"quote":\s*"([^"]*)"\}',
+                        # Pattern for basic message objects
                         r'\{"speaker":\s*"([^"]+)",\s*"side":\s*"([^"]+)",\s*"text":\s*"([^"]+)",\s*"timestamp":\s*"([^"]+)"\}',
+                        # Pattern for speaker and text only
                         r'"speaker":\s*"([^"]+)"[^}]*"text":\s*"([^"]+)"',
+                        # Pattern for malformed JSON
                         r'speaker[:\s]*["\']?([^"\'},]+)["\']?[^}]*text[:\s]*["\']([^"\'}]+)["\']?'
                     ]
                     
@@ -601,6 +606,11 @@ Return ONLY the JSON array, no other text.
                                 if len(match) >= 2:
                                     original_speaker = match[0].strip()
                                     text = match[1].strip()
+                                    
+                                    # Extract additional fields if available
+                                    source_url = match[4] if len(match) > 4 else ""
+                                    quote = match[5] if len(match) > 5 else ""
+                                    
                                     if len(original_speaker) > 1 and len(text) > 5:
                                         # Get a random name that hasn't been used yet
                                         random_name = get_random_name()
@@ -615,10 +625,10 @@ Return ONLY the JSON array, no other text.
                                             "side": side,
                                             "text": text,
                                             "timestamp": datetime.now().isoformat(),
-                                            "source_url": "",
-                                            "quote": "",
+                                            "source_url": source_url,
+                                            "quote": quote,
                                             "news_source": original_speaker,
-                                            "news_source_url": ""
+                                            "news_source_url": source_url
                                         })
                             if conversation:
                                 break

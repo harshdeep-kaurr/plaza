@@ -19,7 +19,7 @@ const topics = [
     },
     {
       id: "general",
-      title: "General",
+      title: "Politics",
       category: "general",
       image: "https://images.unsplash.com/photo-1504711331083-9c895941bf81?q=80&w=1200&auto=format&fit=crop",
       facts: [],
