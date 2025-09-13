@@ -1,10 +1,12 @@
-/** @type {import('tailwindcss').Config} */
+// tailwind.config.js (optional tweak)
 module.exports = {
-  content: [
-    "./src/**/*.{js,jsx,ts,tsx}",
-  ],
+  content: ["./public/**/*.html", "./src/**/*.{js,jsx,ts,tsx}"],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        serif: ['Merriweather', 'Georgia', 'Times New Roman', 'serif'],
+      },
+    },
   },
   plugins: [],
-}
+};

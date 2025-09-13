@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* NYT-style tweaks */
+:root {
+  --ink: #111111;
+  --ink-light: #3a3a3a;
+  --paper: #faf9f7;
+  --rule: #e6e4e0;
+}
+
+html, body, #root { height: 100%; }
+body {
+  font-family: "Merriweather", Georgia, "Times New Roman", serif;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.hr { height: 1px; background: var(--rule); }
+
+.tile:hover img { transform: scale(1.02); }
+.tile img { transition: transform 250ms ease; }
