@@ -1,42 +1,44 @@
 [
   {
-    "name": "Climate Change",
-    "description": "Environmental policies, global warming, and sustainability initiatives",
-    "category": "environment"
+    "id": "business",
+    "title": "Business",
+    "description": "Corporate news, market trends, and economic developments",
+    "category": "business",
+    "image": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop"
   },
   {
-    "name": "Artificial Intelligence",
-    "description": "AI developments, machine learning, and technology ethics",
-    "category": "technology"
+    "id": "technology",
+    "title": "Technology",
+    "description": "AI, software, hardware, and tech industry news",
+    "category": "technology",
+    "image": "https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400&h=300&fit=crop"
   },
   {
-    "name": "Healthcare Policy",
-    "description": "Medical reforms, public health, and healthcare access",
-    "category": "health"
+    "id": "sports",
+    "title": "Sports",
+    "description": "Athletics, tournaments, and sports industry news",
+    "category": "sports",
+    "image": "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop"
   },
   {
-    "name": "Economic Policy",
-    "description": "Fiscal policies, trade agreements, and economic indicators",
-    "category": "economics"
+    "id": "health",
+    "title": "Health",
+    "description": "Medical research, healthcare, and wellness news",
+    "category": "health",
+    "image": "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=300&fit=crop"
   },
   {
-    "name": "Education Reform",
-    "description": "School policies, curriculum changes, and educational funding",
-    "category": "education"
+    "id": "politics",
+    "title": "Politics",
+    "description": "Government, policy, and political developments",
+    "category": "politics",
+    "image": "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=400&h=300&fit=crop"
   },
   {
-    "name": "Immigration",
-    "description": "Border policies, visa programs, and immigration reform",
-    "category": "politics"
-  },
-  {
-    "name": "Social Justice",
-    "description": "Civil rights, equality movements, and social reform",
-    "category": "society"
-  },
-  {
-    "name": "Cybersecurity",
-    "description": "Data protection, privacy laws, and digital security",
-    "category": "technology"
+    "id": "entertainment",
+    "title": "Entertainment",
+    "description": "Movies, music, TV, and celebrity news",
+    "category": "entertainment",
+    "image": "https://images.unsplash.com/photo-1489599803005-0b0b0b0b0b0b?w=400&h=300&fit=crop"
   }
 ]

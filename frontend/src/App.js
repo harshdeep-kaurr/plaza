@@ -74,12 +74,129 @@ function Plaza() {
   const { topicId } = useParams();
   const nav = useNavigate();
   const topic = topics.find((t) => t.id === topicId);
+  const [subtopics, setSubtopics] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch subtopics for this topic
+  useEffect(() => {
+    const fetchSubtopics = async () => {
+      if (!topicId || !topic?.category) return;
+      
+      try {
+        setIsLoading(true);
+        
+        const response = await fetch(`${API_BASE_URL}/api/subtopics/${topic.category}`);
+        
+        if (!response.ok) {
+          throw new Error(`Backend API error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.subtopics) {
+          setSubtopics(data.subtopics);
+        } else {
+          throw new Error(`Backend error: ${data.message || 'Invalid response'}`);
+        }
+        
+      } catch (error) {
+        console.error('Error fetching subtopics:', error);
+        setSubtopics([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSubtopics();
+  }, [topicId, topic]);
+
+  if (!topic) {
+    return (
+      <main className="max-w-3xl mx-auto px-4 py-10">
+        <button onClick={() => nav(-1)} className="underline">← Back</button>
+        <p className="mt-6">Topic not found.</p>
+      </main>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <main className="max-w-3xl mx-auto px-4 pt-8 pb-24">
+        <header className="mb-4">
+          <button onClick={() => nav(-1)} className="underline">← Back</button>
+          <h1 className="text-4xl md:text-5xl font-black leading-tight mt-3">
+            {topic.title}
+          </h1>
+        </header>
+        <div className="hr my-6"></div>
+        <div className="text-center py-10">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[color:var(--ink)] mx-auto"></div>
+          <p className="mt-4 text-[color:var(--ink-light)]">Loading subtopics...</p>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="max-w-3xl mx-auto px-4 pt-8 pb-24">
+      <header className="mb-4">
+        <button onClick={() => nav(-1)} className="underline">← Back</button>
+        <h1 className="text-4xl md:text-5xl font-black leading-tight mt-3">
+          {topic.title}
+        </h1>
+        <p className="text-lg text-[color:var(--ink-light)] mt-2">
+          {topic.description}
+        </p>
+      </header>
+
+      <div className="hr my-6"></div>
+
+      <section aria-labelledby="subtopics" className="mb-10">
+        <h2 id="subtopics" className="text-xl font-black mb-4">This Week's Stories</h2>
+        <div className="space-y-4">
+          {subtopics.length > 0 ? subtopics.map((subtopic) => (
+            <Link
+              key={subtopic.id}
+              to={`/plaza/${topicId}/${subtopic.id}`}
+              className="block p-4 border border-[color:var(--rule)] rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-bold text-lg">{subtopic.title}</h3>
+                <span className="text-sm text-[color:var(--ink-light)] bg-gray-100 px-2 py-1 rounded">
+                  {subtopic.article_count} articles
+                </span>
+              </div>
+              <p className="text-[color:var(--ink-light)] text-sm mb-2">
+                {subtopic.description}
+              </p>
+              {subtopic.latest_article && (
+                <div className="text-xs text-[color:var(--ink-light)]">
+                  Latest: {subtopic.latest_article.title?.substring(0, 100)}...
+                </div>
+              )}
+            </Link>
+          )) : (
+            <div className="text-center py-8 text-[color:var(--ink-light)]">
+              <p>No subtopics found for this week.</p>
+              <p className="text-sm mt-2">Check back later for new stories.</p>
+            </div>
+          )}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function SubPlaza() {
+  const { topicId, subtopicId } = useParams();
+  const nav = useNavigate();
+  const topic = topics.find((t) => t.id === topicId);
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [articles, setArticles] = useState([]);
-  const [facts, setFacts] = useState([]);
+  const [subtopic, setSubtopic] = useState(null);
   const messagesEndRef = useRef(null);
 
   // Debug environment variables
@@ -98,78 +215,38 @@ function Plaza() {
     scrollToBottom();
   }, [messages]);
 
-  // Fetch topic data from News API
+  // Fetch subtopic data
   useEffect(() => {
-    const fetchTopicData = async () => {
-      if (!topicId || !topic?.category) return;
+    const fetchSubtopicData = async () => {
+      if (!topicId || !subtopicId || !topic?.category) return;
       
       try {
         setIsLoading(true);
         
-        // Calculate date range for past week
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-        const fromDate = oneWeekAgo.toISOString().split('T')[0];
-        const toDate = new Date().toISOString().split('T')[0];
+        const response = await fetch(`${API_BASE_URL}/api/subtopic/${topic.category}/${subtopicId}`);
         
-        // Fetch news articles through backend API
-        console.log('Fetching news for category:', topic.category);
-        
-        // Convert category to search query
-        const searchQuery = getSearchQueryForCategory(topic.category);
-        console.log('Search query:', searchQuery);
-        
-        const params = new URLSearchParams({
-          q: searchQuery,
-          days: 7
-        });
-        
-        const backendResponse = await fetch(`${API_BASE_URL}/api/news?${params}`);
-        
-        if (!backendResponse.ok) {
-          throw new Error(`Backend API error: ${backendResponse.status}`);
+        if (!response.ok) {
+          throw new Error(`Backend API error: ${response.status}`);
         }
         
-        const newsData = await backendResponse.json();
-        console.log('Backend news response:', newsData);
+        const data = await response.json();
         
-        if (newsData.success && newsData.articles) {
-          setArticles(newsData.articles);
-          
-          // Check if we have articles
-          if (newsData.articles.length > 0) {
-            // Generate facts from articles
-            const generatedFacts = generateFactsFromArticles(newsData.articles, topic.category);
-            setFacts(generatedFacts);
-            
-            // Generate initial chat discussion
-            const initialChat = generateInitialChat(newsData.articles, topic.category);
-            setMessages(initialChat);
-          } else {
-            // No articles found, show debug info
-            setFacts([`No articles found for ${topic.category}. Backend Response: ${JSON.stringify(newsData, null, 2)}`]);
-            setMessages([{
-              id: 1,
-              speaker: "Debug Info",
-              side: "left",
-              text: `Backend returned ${newsData.total_articles || 0} articles for category: ${topic.category}`,
-              timestamp: new Date().toISOString()
-            }]);
-          }
+        if (data.success) {
+          setSubtopic(data.subtopic);
+          setArticles(data.articles || []);
+          setMessages(data.conversation || []);
         } else {
-          throw new Error(`Backend error: ${newsData.message || 'Invalid response'}`);
+          throw new Error(`Backend error: ${data.message || 'Invalid response'}`);
         }
         
       } catch (error) {
-        console.error('Error fetching news data:', error);
-        // Show debug info instead of fallback content
+        console.error('Error fetching subtopic data:', error);
         setArticles([]);
-        setFacts([`Error fetching news: ${error.message}. Check console for details.`]);
         setMessages([{
           id: 1,
-          speaker: "Debug Error",
+          speaker: "Error",
           side: "left",
-          text: `Backend API Error: ${error.message}. Make sure your backend is running and has the News API key in backend/.env`,
+          text: `Error loading subtopic: ${error.message}`,
           timestamp: new Date().toISOString()
         }]);
       } finally {
@@ -177,178 +254,9 @@ function Plaza() {
       }
     };
 
-    fetchTopicData();
-  }, [topicId, topic]);
+    fetchSubtopicData();
+  }, [topicId, subtopicId, topic]);
 
-  // Get search query for News API based on category
-  const getSearchQueryForCategory = (category) => {
-    const searchQueries = {
-      'business': 'business economy finance market stocks',
-      'entertainment': 'entertainment movies music tv celebrities',
-      'health': 'health medical research healthcare medicine',
-      'science': 'science research technology innovation discovery',
-      'sports': 'sports football basketball soccer tennis',
-      'technology': 'technology AI artificial intelligence software tech'
-    };
-    
-    return searchQueries[category] || category;
-  };
-
-  // Generate fallback facts when API fails
-  const generateFallbackFacts = (category) => {
-    const fallbackFacts = {
-      'business': [
-        "Market trends continue to evolve with changing economic conditions.",
-        "Corporate earnings reports show mixed results across different sectors.",
-        "Investor sentiment remains cautious amid global economic uncertainty."
-      ],
-      'entertainment': [
-        "New releases continue to shape the entertainment landscape.",
-        "Streaming platforms are investing heavily in original content.",
-        "Award season brings attention to outstanding performances and productions."
-      ],
-      'health': [
-        "Medical research continues to advance treatment options.",
-        "Public health initiatives focus on preventive care and wellness.",
-        "Healthcare systems adapt to changing patient needs and technology."
-      ],
-      'science': [
-        "Scientific discoveries continue to expand our understanding of the world.",
-        "Research institutions collaborate on breakthrough innovations.",
-        "Technology and science intersect to solve complex global challenges."
-      ],
-      'sports': [
-        "Athletes continue to push the boundaries of human performance.",
-        "Major tournaments and championships draw global attention.",
-        "Sports technology and training methods continue to evolve."
-      ],
-      'technology': [
-        "Artificial intelligence and machine learning drive innovation across industries.",
-        "Cybersecurity remains a top priority for organizations worldwide.",
-        "Emerging technologies continue to transform how we work and live."
-      ],
-      'general': [
-        "Global events continue to shape international relations and policies.",
-        "Social and economic developments impact communities worldwide.",
-        "Breaking news stories capture public attention and drive discussions."
-      ]
-    };
-    
-    return fallbackFacts[category] || ["Recent developments in this area are being closely monitored."];
-  };
-
-  // Generate fallback chat when API fails
-  const generateFallbackChat = (category) => {
-    const personas = [
-      { name: "Financial Reporter", outlet: "Financial Times" },
-      { name: "Tech Journalist", outlet: "TechCrunch" },
-      { name: "General Reporter", outlet: "Associated Press" }
-    ];
-    
-    const categoryMessages = {
-      'business': [
-        "Market analysts are closely watching economic indicators and corporate earnings.",
-        "Investment strategies continue to adapt to changing market conditions.",
-        "Business leaders are navigating complex regulatory and economic landscapes."
-      ],
-      'entertainment': [
-        "The entertainment industry continues to evolve with new platforms and content.",
-        "Award shows and festivals highlight outstanding creative achievements.",
-        "Streaming services are reshaping how audiences consume entertainment."
-      ],
-      'health': [
-        "Medical professionals continue to advance treatment options and patient care.",
-        "Public health initiatives focus on prevention and community wellness.",
-        "Healthcare technology is transforming how medical services are delivered."
-      ],
-      'science': [
-        "Scientific research continues to push the boundaries of human knowledge.",
-        "Collaborative efforts between institutions drive breakthrough discoveries.",
-        "Technology and science work together to address global challenges."
-      ],
-      'sports': [
-        "Athletes continue to achieve remarkable feats and break records.",
-        "Sports organizations adapt to changing fan expectations and technology.",
-        "Training methods and sports science continue to evolve."
-      ],
-      'technology': [
-        "Tech companies continue to innovate and shape the digital landscape.",
-        "Artificial intelligence and automation are transforming industries.",
-        "Cybersecurity and data privacy remain critical concerns."
-      ],
-      'general': [
-        "Global events continue to shape international relations and policies.",
-        "Social and economic developments impact communities worldwide.",
-        "Breaking news stories capture public attention and drive discussions."
-      ]
-    };
-    
-    const messages = categoryMessages[category] || ["Recent developments in this area are being closely monitored."];
-    
-    return messages.map((text, index) => ({
-      id: index + 1,
-      speaker: `${personas[index % personas.length].name} (${personas[index % personas.length].outlet})`,
-      side: index % 2 === 0 ? "left" : "right",
-      text: text,
-      timestamp: new Date().toISOString()
-    }));
-  };
-
-  // Generate facts from news articles
-  const generateFactsFromArticles = (articles, category) => {
-    if (!articles || articles.length === 0) {
-      return [`No recent news found for ${category} category.`];
-    }
-    
-    const facts = [];
-    const topArticles = articles.slice(0, 5); // Use top 5 articles
-    
-    topArticles.forEach((article, index) => {
-      if (article.title && article.description) {
-        // Create a fact from the article title and description
-        const fact = `${article.title}: ${article.description.substring(0, 150)}...`;
-        facts.push(fact);
-      }
-    });
-    
-    return facts.length > 0 ? facts : [`Recent developments in ${category} are being closely monitored.`];
-  };
-
-  // Generate initial chat discussion from news articles
-  const generateInitialChat = (articles, category) => {
-    if (!articles || articles.length === 0) {
-      return [{
-        id: 1,
-        speaker: "News Analyst",
-        side: "left",
-        text: `No recent news found for ${category} category. Check back later for updates.`,
-        timestamp: new Date().toISOString()
-      }];
-    }
-    
-    const chat = [];
-    const topArticles = articles.slice(0, 3); // Use top 3 articles for initial discussion
-    
-    const personas = [
-      { name: "Financial Reporter", outlet: "Financial Times" },
-      { name: "Tech Journalist", outlet: "TechCrunch" },
-      { name: "General Reporter", outlet: "Associated Press" }
-    ];
-    
-    topArticles.forEach((article, index) => {
-      const persona = personas[index % personas.length];
-      const message = {
-        id: index + 1,
-        speaker: `${persona.name} (${persona.outlet})`,
-        side: index % 2 === 0 ? "left" : "right",
-        text: `${article.title}: ${article.description?.substring(0, 200)}...`,
-        timestamp: new Date().toISOString()
-      };
-      chat.push(message);
-    });
-    
-    return chat;
-  };
 
   if (!topic) {
     return (
@@ -377,18 +285,35 @@ function Plaza() {
     setIsTyping(true);
 
     try {
-      // Generate AI responses based on news articles and user input
-      const aiResponses = generateAIResponses(inputValue.trim(), articles, topic?.category);
-      
-      // Add responses with staggered timing
-      aiResponses.forEach((response, index) => {
-        setTimeout(() => {
-          setMessages(prev => [...prev, response]);
-        }, (index + 1) * 1000);
+      // Send message to backend for AI response
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: inputValue.trim(),
+          topic: topic?.title || '',
+          subtopic: subtopic?.title || '',
+          articles: articles,
+          history: messages.slice(-5) // Last 5 messages for context
+        })
       });
+
+      if (!response.ok) {
+        throw new Error(`Backend API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.response) {
+        setMessages(prev => [...prev, data.response]);
+      } else {
+        throw new Error(data.message || 'Invalid response');
+      }
       
     } catch (error) {
-      console.error('Error generating AI response:', error);
+      console.error('Error sending message:', error);
       // Fallback response
       const fallbackResponse = {
         id: Date.now() + 1,
@@ -403,80 +328,16 @@ function Plaza() {
     }
   };
 
-  // Generate AI responses based on news articles
-  const generateAIResponses = (userInput, articles, category) => {
-    const responses = [];
-    const numResponses = Math.random() > 0.5 ? 2 : 1;
-    
-    const personas = [
-      { name: "Financial Reporter", outlet: "Financial Times" },
-      { name: "Tech Journalist", outlet: "TechCrunch" },
-      { name: "General Reporter", outlet: "Associated Press" },
-      { name: "Science Writer", outlet: "Scientific American" },
-      { name: "Business Analyst", outlet: "Wall Street Journal" }
-    ];
-    
-    for (let i = 0; i < numResponses; i++) {
-      const persona = personas[Math.floor(Math.random() * personas.length)];
-      const response = generatePersonaResponse(userInput, persona, articles, category);
-      responses.push(response);
-    }
-    
-    return responses;
-  };
 
-  // Generate response for a specific persona
-  const generatePersonaResponse = (userInput, persona, articles, category) => {
-    const baseResponses = {
-      "Financial Reporter": [
-        "From a financial perspective, this development could have significant market implications.",
-        "The economic data suggests interesting trends that investors should monitor closely.",
-        "This could impact various sectors differently depending on implementation and timing."
-      ],
-      "Tech Journalist": [
-        "The technological implications of this are quite significant and evolving rapidly.",
-        "From an innovation standpoint, this represents both opportunities and challenges.",
-        "The tech industry is closely watching how this develops given the potential impact."
-      ],
-      "General Reporter": [
-        "This is a developing story that we're continuing to monitor closely.",
-        "The facts are still emerging and we're working to verify all information.",
-        "This situation requires careful fact-checking and multiple source verification."
-      ],
-      "Science Writer": [
-        "The scientific community has been discussing this topic extensively with fascinating findings.",
-        "Recent studies have provided new insights that challenge some previous assumptions.",
-        "This is an area where interdisciplinary research is particularly valuable."
-      ],
-      "Business Analyst": [
-        "From a business standpoint, this could have significant implications for market dynamics.",
-        "The economic data shows interesting trends that investors should be watching closely.",
-        "This development could impact various sectors differently depending on implementation."
-      ]
-    };
 
-    const personaResponses = baseResponses[persona.name] || ["That's an interesting perspective on this topic."];
-    const randomResponse = personaResponses[Math.floor(Math.random() * personaResponses.length)];
-    
-    // If we have relevant articles, reference them
-    let responseText = randomResponse;
-    if (articles && articles.length > 0) {
-      const relevantArticle = articles[Math.floor(Math.random() * Math.min(articles.length, 3))];
-      if (relevantArticle) {
-        responseText += ` For example, recent reports show that ${relevantArticle.title?.substring(0, 100)}...`;
-      }
-    }
-    
-    return {
-      id: Date.now() + Math.random(),
-      speaker: `${persona.name} (${persona.outlet})`,
-      side: "left",
-      text: responseText,
-      isUser: false,
-      timestamp: new Date().toISOString()
-    };
-  };
-
+  if (!topic) {
+    return (
+      <main className="max-w-3xl mx-auto px-4 py-10">
+        <button onClick={() => nav(-1)} className="underline">← Back</button>
+        <p className="mt-6">Topic not found.</p>
+      </main>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -484,13 +345,13 @@ function Plaza() {
         <header className="mb-4">
           <button onClick={() => nav(-1)} className="underline">← Back</button>
           <h1 className="text-4xl md:text-5xl font-black leading-tight mt-3">
-            {topic.title}
+            {subtopic?.title || 'Loading...'}
           </h1>
         </header>
         <div className="hr my-6"></div>
         <div className="text-center py-10">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[color:var(--ink)] mx-auto"></div>
-          <p className="mt-4 text-[color:var(--ink-light)]">Loading latest news and perspectives...</p>
+          <p className="mt-4 text-[color:var(--ink-light)]">Loading conversation and articles...</p>
         </div>
       </main>
     );
@@ -498,23 +359,28 @@ function Plaza() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 pt-8 pb-24">
-      {/* Minimalist top */}
       <header className="mb-4">
         <button onClick={() => nav(-1)} className="underline">← Back</button>
         <h1 className="text-4xl md:text-5xl font-black leading-tight mt-3">
-          {topic.title}
+          {subtopic?.title || 'Subtopic'}
         </h1>
+        <p className="text-lg text-[color:var(--ink-light)] mt-2">
+          {subtopic?.description}
+        </p>
       </header>
 
       <div className="hr my-6"></div>
 
-      {/* Known facts */}
-      <section aria-labelledby="facts" className="mb-10">
-        <h2 id="facts" className="text-xl font-black mb-3">Latest News Summary</h2>
+      {/* Articles summary */}
+      <section aria-labelledby="articles" className="mb-10">
+        <h2 id="articles" className="text-xl font-black mb-3">Latest News Summary</h2>
         <ul className="space-y-2 text-[color:var(--ink-light)]">
-          {facts.length > 0 ? facts.map((f, i) => (
+          {articles.length > 0 ? articles.slice(0, 4).map((article, i) => (
             <li key={i} className="pl-4 relative">
-              <span className="absolute left-0 top-0">•</span>{f}
+              <span className="absolute left-0 top-0">•</span>
+              <a href={article.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                {article.title}: {article.summary || article.description?.substring(0, 150)}...
+              </a>
             </li>
           )) : (
             <li className="pl-4 relative">
@@ -591,6 +457,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/plaza/:topicId" element={<Plaza />} />
+      <Route path="/plaza/:topicId/:subtopicId" element={<SubPlaza />} />
     </Routes>
   );
 }
