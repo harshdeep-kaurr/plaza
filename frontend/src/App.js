@@ -32,11 +32,11 @@ function Home() {
           Plaza
         </h1>
         <h2 className="text-2xl font-bold text-[color:var(--ink-light)] mt-2">
-          Explore Different Perspectives
+          Where Headlines Become Conversations
         </h2>
         <div className="hr my-6"></div>
         <p className="text-lg text-[color:var(--ink-light)] max-w-3xl">
-          A front page of conversations. Choose a topic to enter its plaza.
+          Jump into the conversation. Each topic has its plaza.
         </p>
       </header>
 
@@ -48,8 +48,8 @@ function Home() {
             key={t.id}
             className="tile group block"
           >
-            <article className="bg-white shadow-sm ring-1 ring-[color:var(--rule)] h-80 flex flex-col">
-              <div className="flex-1 overflow-hidden">
+            <article className="bg-white shadow-sm ring-1 ring-[color:var(--rule)] h-96 flex flex-col">
+              <div className="h-64 overflow-hidden">
                 <img
                   src={t.image}
                   alt={t.title}
@@ -57,10 +57,13 @@ function Home() {
                   loading="lazy"
                 />
               </div>
-              <div className="p-4 h-20 flex items-center">
-                <h2 className="font-black text-2xl leading-snug">
+              <div className="p-4 flex flex-col justify-center">
+                <h2 className="font-black text-2xl leading-snug mb-2">
                   {t.title}
                 </h2>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {t.description}
+                </p>
               </div>
             </article>
           </Link>
