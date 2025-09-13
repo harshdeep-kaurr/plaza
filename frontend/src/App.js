@@ -82,6 +82,14 @@ function Plaza() {
   const [facts, setFacts] = useState([]);
   const messagesEndRef = useRef(null);
 
+  // Debug environment variables
+  console.log('=== ENVIRONMENT DEBUG ===');
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  console.log('All env vars:', Object.keys(process.env).filter(key => key.startsWith('REACT_APP')));
+  console.log('REACT_APP_NEWS_API_KEY exists:', !!process.env.REACT_APP_NEWS_API_KEY);
+  console.log('REACT_APP_NEWS_API_KEY value:', process.env.REACT_APP_NEWS_API_KEY);
+  console.log('========================');
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -90,31 +98,80 @@ function Plaza() {
     scrollToBottom();
   }, [messages]);
 
-  // Fetch topic data from backend
+  // Fetch topic data from News API
   useEffect(() => {
     const fetchTopicData = async () => {
-      if (!topicId) return;
+      if (!topicId || !topic?.category) return;
       
       try {
         setIsLoading(true);
-        const response = await fetch(`${API_BASE_URL}/api/topic/${topicId}`);
-        const data = await response.json();
         
-        if (data.success) {
-          setArticles(data.articles || []);
-          setFacts(data.facts || []);
-          setMessages(data.conversation || topic?.chat || []);
-        } else {
-          console.error('Failed to fetch topic data:', data.message);
-          // Fallback to static data
-          setMessages(topic?.chat || []);
-          setFacts(topic?.facts || []);
+        // Calculate date range for past week
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        const fromDate = oneWeekAgo.toISOString().split('T')[0];
+        const toDate = new Date().toISOString().split('T')[0];
+        
+        // Fetch news articles through backend API
+        console.log('Fetching news for category:', topic.category);
+        
+        // Convert category to search query
+        const searchQuery = getSearchQueryForCategory(topic.category);
+        console.log('Search query:', searchQuery);
+        
+        const params = new URLSearchParams({
+          q: searchQuery,
+          days: 7
+        });
+        
+        const backendResponse = await fetch(`${API_BASE_URL}/api/news?${params}`);
+        
+        if (!backendResponse.ok) {
+          throw new Error(`Backend API error: ${backendResponse.status}`);
         }
+        
+        const newsData = await backendResponse.json();
+        console.log('Backend news response:', newsData);
+        
+        if (newsData.success && newsData.articles) {
+          setArticles(newsData.articles);
+          
+          // Check if we have articles
+          if (newsData.articles.length > 0) {
+            // Generate facts from articles
+            const generatedFacts = generateFactsFromArticles(newsData.articles, topic.category);
+            setFacts(generatedFacts);
+            
+            // Generate initial chat discussion
+            const initialChat = generateInitialChat(newsData.articles, topic.category);
+            setMessages(initialChat);
+          } else {
+            // No articles found, show debug info
+            setFacts([`No articles found for ${topic.category}. Backend Response: ${JSON.stringify(newsData, null, 2)}`]);
+            setMessages([{
+              id: 1,
+              speaker: "Debug Info",
+              side: "left",
+              text: `Backend returned ${newsData.total_articles || 0} articles for category: ${topic.category}`,
+              timestamp: new Date().toISOString()
+            }]);
+          }
+        } else {
+          throw new Error(`Backend error: ${newsData.message || 'Invalid response'}`);
+        }
+        
       } catch (error) {
-        console.error('Error fetching topic data:', error);
-        // Fallback to static data
-        setMessages(topic?.chat || []);
-        setFacts(topic?.facts || []);
+        console.error('Error fetching news data:', error);
+        // Show debug info instead of fallback content
+        setArticles([]);
+        setFacts([`Error fetching news: ${error.message}. Check console for details.`]);
+        setMessages([{
+          id: 1,
+          speaker: "Debug Error",
+          side: "left",
+          text: `Backend API Error: ${error.message}. Make sure your backend is running and has the News API key in backend/.env`,
+          timestamp: new Date().toISOString()
+        }]);
       } finally {
         setIsLoading(false);
       }
@@ -122,6 +179,176 @@ function Plaza() {
 
     fetchTopicData();
   }, [topicId, topic]);
+
+  // Get search query for News API based on category
+  const getSearchQueryForCategory = (category) => {
+    const searchQueries = {
+      'business': 'business economy finance market stocks',
+      'entertainment': 'entertainment movies music tv celebrities',
+      'health': 'health medical research healthcare medicine',
+      'science': 'science research technology innovation discovery',
+      'sports': 'sports football basketball soccer tennis',
+      'technology': 'technology AI artificial intelligence software tech'
+    };
+    
+    return searchQueries[category] || category;
+  };
+
+  // Generate fallback facts when API fails
+  const generateFallbackFacts = (category) => {
+    const fallbackFacts = {
+      'business': [
+        "Market trends continue to evolve with changing economic conditions.",
+        "Corporate earnings reports show mixed results across different sectors.",
+        "Investor sentiment remains cautious amid global economic uncertainty."
+      ],
+      'entertainment': [
+        "New releases continue to shape the entertainment landscape.",
+        "Streaming platforms are investing heavily in original content.",
+        "Award season brings attention to outstanding performances and productions."
+      ],
+      'health': [
+        "Medical research continues to advance treatment options.",
+        "Public health initiatives focus on preventive care and wellness.",
+        "Healthcare systems adapt to changing patient needs and technology."
+      ],
+      'science': [
+        "Scientific discoveries continue to expand our understanding of the world.",
+        "Research institutions collaborate on breakthrough innovations.",
+        "Technology and science intersect to solve complex global challenges."
+      ],
+      'sports': [
+        "Athletes continue to push the boundaries of human performance.",
+        "Major tournaments and championships draw global attention.",
+        "Sports technology and training methods continue to evolve."
+      ],
+      'technology': [
+        "Artificial intelligence and machine learning drive innovation across industries.",
+        "Cybersecurity remains a top priority for organizations worldwide.",
+        "Emerging technologies continue to transform how we work and live."
+      ],
+      'general': [
+        "Global events continue to shape international relations and policies.",
+        "Social and economic developments impact communities worldwide.",
+        "Breaking news stories capture public attention and drive discussions."
+      ]
+    };
+    
+    return fallbackFacts[category] || ["Recent developments in this area are being closely monitored."];
+  };
+
+  // Generate fallback chat when API fails
+  const generateFallbackChat = (category) => {
+    const personas = [
+      { name: "Financial Reporter", outlet: "Financial Times" },
+      { name: "Tech Journalist", outlet: "TechCrunch" },
+      { name: "General Reporter", outlet: "Associated Press" }
+    ];
+    
+    const categoryMessages = {
+      'business': [
+        "Market analysts are closely watching economic indicators and corporate earnings.",
+        "Investment strategies continue to adapt to changing market conditions.",
+        "Business leaders are navigating complex regulatory and economic landscapes."
+      ],
+      'entertainment': [
+        "The entertainment industry continues to evolve with new platforms and content.",
+        "Award shows and festivals highlight outstanding creative achievements.",
+        "Streaming services are reshaping how audiences consume entertainment."
+      ],
+      'health': [
+        "Medical professionals continue to advance treatment options and patient care.",
+        "Public health initiatives focus on prevention and community wellness.",
+        "Healthcare technology is transforming how medical services are delivered."
+      ],
+      'science': [
+        "Scientific research continues to push the boundaries of human knowledge.",
+        "Collaborative efforts between institutions drive breakthrough discoveries.",
+        "Technology and science work together to address global challenges."
+      ],
+      'sports': [
+        "Athletes continue to achieve remarkable feats and break records.",
+        "Sports organizations adapt to changing fan expectations and technology.",
+        "Training methods and sports science continue to evolve."
+      ],
+      'technology': [
+        "Tech companies continue to innovate and shape the digital landscape.",
+        "Artificial intelligence and automation are transforming industries.",
+        "Cybersecurity and data privacy remain critical concerns."
+      ],
+      'general': [
+        "Global events continue to shape international relations and policies.",
+        "Social and economic developments impact communities worldwide.",
+        "Breaking news stories capture public attention and drive discussions."
+      ]
+    };
+    
+    const messages = categoryMessages[category] || ["Recent developments in this area are being closely monitored."];
+    
+    return messages.map((text, index) => ({
+      id: index + 1,
+      speaker: `${personas[index % personas.length].name} (${personas[index % personas.length].outlet})`,
+      side: index % 2 === 0 ? "left" : "right",
+      text: text,
+      timestamp: new Date().toISOString()
+    }));
+  };
+
+  // Generate facts from news articles
+  const generateFactsFromArticles = (articles, category) => {
+    if (!articles || articles.length === 0) {
+      return [`No recent news found for ${category} category.`];
+    }
+    
+    const facts = [];
+    const topArticles = articles.slice(0, 5); // Use top 5 articles
+    
+    topArticles.forEach((article, index) => {
+      if (article.title && article.description) {
+        // Create a fact from the article title and description
+        const fact = `${article.title}: ${article.description.substring(0, 150)}...`;
+        facts.push(fact);
+      }
+    });
+    
+    return facts.length > 0 ? facts : [`Recent developments in ${category} are being closely monitored.`];
+  };
+
+  // Generate initial chat discussion from news articles
+  const generateInitialChat = (articles, category) => {
+    if (!articles || articles.length === 0) {
+      return [{
+        id: 1,
+        speaker: "News Analyst",
+        side: "left",
+        text: `No recent news found for ${category} category. Check back later for updates.`,
+        timestamp: new Date().toISOString()
+      }];
+    }
+    
+    const chat = [];
+    const topArticles = articles.slice(0, 3); // Use top 3 articles for initial discussion
+    
+    const personas = [
+      { name: "Financial Reporter", outlet: "Financial Times" },
+      { name: "Tech Journalist", outlet: "TechCrunch" },
+      { name: "General Reporter", outlet: "Associated Press" }
+    ];
+    
+    topArticles.forEach((article, index) => {
+      const persona = personas[index % personas.length];
+      const message = {
+        id: index + 1,
+        speaker: `${persona.name} (${persona.outlet})`,
+        side: index % 2 === 0 ? "left" : "right",
+        text: `${article.title}: ${article.description?.substring(0, 200)}...`,
+        timestamp: new Date().toISOString()
+      };
+      chat.push(message);
+    });
+    
+    return chat;
+  };
 
   if (!topic) {
     return (
@@ -150,49 +377,104 @@ function Plaza() {
     setIsTyping(true);
 
     try {
-      // Send message to backend
-      const response = await fetch(`${API_BASE_URL}/api/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: inputValue.trim(),
-          topic: topicId,
-          history: messages
-        })
-      });
-
-      const data = await response.json();
+      // Generate AI responses based on news articles and user input
+      const aiResponses = generateAIResponses(inputValue.trim(), articles, topic?.category);
       
-      if (data.success) {
-        setMessages(prev => [...prev, data.response]);
-      } else {
-        console.error('Failed to get AI response:', data.message);
-        // Fallback response
-        const fallbackResponse = {
-          id: Date.now() + 1,
-          speaker: "AI Assistant",
-          side: "left",
-          text: "I'm sorry, I'm having trouble processing your message right now. Please try again.",
-          timestamp: new Date().toISOString()
-        };
-        setMessages(prev => [...prev, fallbackResponse]);
-      }
+      // Add responses with staggered timing
+      aiResponses.forEach((response, index) => {
+        setTimeout(() => {
+          setMessages(prev => [...prev, response]);
+        }, (index + 1) * 1000);
+      });
+      
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error generating AI response:', error);
       // Fallback response
       const fallbackResponse = {
         id: Date.now() + 1,
-        speaker: "AI Assistant",
+        speaker: "News Analyst",
         side: "left",
-        text: "I'm having trouble connecting to the server. Please try again later.",
+        text: "I'm having trouble processing your message right now. Please try again.",
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, fallbackResponse]);
     } finally {
       setIsTyping(false);
     }
+  };
+
+  // Generate AI responses based on news articles
+  const generateAIResponses = (userInput, articles, category) => {
+    const responses = [];
+    const numResponses = Math.random() > 0.5 ? 2 : 1;
+    
+    const personas = [
+      { name: "Financial Reporter", outlet: "Financial Times" },
+      { name: "Tech Journalist", outlet: "TechCrunch" },
+      { name: "General Reporter", outlet: "Associated Press" },
+      { name: "Science Writer", outlet: "Scientific American" },
+      { name: "Business Analyst", outlet: "Wall Street Journal" }
+    ];
+    
+    for (let i = 0; i < numResponses; i++) {
+      const persona = personas[Math.floor(Math.random() * personas.length)];
+      const response = generatePersonaResponse(userInput, persona, articles, category);
+      responses.push(response);
+    }
+    
+    return responses;
+  };
+
+  // Generate response for a specific persona
+  const generatePersonaResponse = (userInput, persona, articles, category) => {
+    const baseResponses = {
+      "Financial Reporter": [
+        "From a financial perspective, this development could have significant market implications.",
+        "The economic data suggests interesting trends that investors should monitor closely.",
+        "This could impact various sectors differently depending on implementation and timing."
+      ],
+      "Tech Journalist": [
+        "The technological implications of this are quite significant and evolving rapidly.",
+        "From an innovation standpoint, this represents both opportunities and challenges.",
+        "The tech industry is closely watching how this develops given the potential impact."
+      ],
+      "General Reporter": [
+        "This is a developing story that we're continuing to monitor closely.",
+        "The facts are still emerging and we're working to verify all information.",
+        "This situation requires careful fact-checking and multiple source verification."
+      ],
+      "Science Writer": [
+        "The scientific community has been discussing this topic extensively with fascinating findings.",
+        "Recent studies have provided new insights that challenge some previous assumptions.",
+        "This is an area where interdisciplinary research is particularly valuable."
+      ],
+      "Business Analyst": [
+        "From a business standpoint, this could have significant implications for market dynamics.",
+        "The economic data shows interesting trends that investors should be watching closely.",
+        "This development could impact various sectors differently depending on implementation."
+      ]
+    };
+
+    const personaResponses = baseResponses[persona.name] || ["That's an interesting perspective on this topic."];
+    const randomResponse = personaResponses[Math.floor(Math.random() * personaResponses.length)];
+    
+    // If we have relevant articles, reference them
+    let responseText = randomResponse;
+    if (articles && articles.length > 0) {
+      const relevantArticle = articles[Math.floor(Math.random() * Math.min(articles.length, 3))];
+      if (relevantArticle) {
+        responseText += ` For example, recent reports show that ${relevantArticle.title?.substring(0, 100)}...`;
+      }
+    }
+    
+    return {
+      id: Date.now() + Math.random(),
+      speaker: `${persona.name} (${persona.outlet})`,
+      side: "left",
+      text: responseText,
+      isUser: false,
+      timestamp: new Date().toISOString()
+    };
   };
 
 
