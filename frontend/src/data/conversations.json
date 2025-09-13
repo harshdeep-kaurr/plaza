@@ -5,7 +5,7 @@
       "topic": "Climate Change",
       "articleId": "climate-1",
       "persona": {
-        "name": "Dr. Sarah Chen",
+        "name": "Claire",
         "bias": "left",
         "description": "Environmental scientist and climate advocate",
         "avatar": "👩‍🔬"
@@ -38,7 +38,7 @@
       "topic": "Artificial Intelligence",
       "articleId": "ai-1",
       "persona": {
-        "name": "Mike Rodriguez",
+        "name": "Alice",
         "bias": "center",
         "description": "Technology policy researcher",
         "avatar": "👨‍💻"

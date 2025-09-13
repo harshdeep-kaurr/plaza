@@ -13,19 +13,19 @@ const topics = [
       ],
       chat: [
         {
-          speaker: "Dr. Sarah Chen (Nature)",
+          speaker: "Claire (Nature)",
           side: "left",
           text:
             "Latest climate models show we're approaching critical thresholds faster than previous estimates suggested."
         },
         {
-          speaker: "Mike Rodriguez (WSJ)",
+          speaker: "Alice (WSJ)",
           side: "right",
           text:
             "Energy companies are reporting record investments in renewables, but fossil fuel demand remains strong."
         },
         {
-          speaker: "Dr. Elena Patel (Scientific American)",
+          speaker: "Bob (Scientific American)",
           side: "left",
           text:
             "Adaptation strategies are becoming more urgent as extreme weather events increase in frequency and intensity."

@@ -2,12 +2,33 @@ import React, { useState, useRef, useEffect } from "react";
 import { Routes, Route, Link, useParams, useNavigate } from "react-router-dom";
 import topics from "./data/topics";
 
+// Backend API base URL
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+
 function Home() {
   return (
     <main className="max-w-6xl mx-auto px-4 py-10">
       {/* Header */}
       <header className="mb-8">
-        <h1 className="text-5xl leading-tight tracking-tight font-black">
+        <h1 className="text-5xl leading-tight tracking-tight font-black flex items-center gap-4">
+          <svg 
+            width="48" 
+            height="48" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            xmlns="http://www.w3.org/2000/svg"
+            className="text-[color:var(--ink)]"
+          >
+            <rect x="2" y="2" width="20" height="20" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+            <rect x="6" y="6" width="4" height="4" rx="1" fill="currentColor"/>
+            <rect x="14" y="6" width="4" height="4" rx="1" fill="currentColor"/>
+            <rect x="6" y="14" width="4" height="4" rx="1" fill="currentColor"/>
+            <rect x="14" y="14" width="4" height="4" rx="1" fill="currentColor"/>
+            <circle cx="10" cy="10" r="1" fill="currentColor"/>
+            <circle cx="14" cy="10" r="1" fill="currentColor"/>
+            <circle cx="10" cy="14" r="1" fill="currentColor"/>
+            <circle cx="14" cy="14" r="1" fill="currentColor"/>
+          </svg>
           Plaza
         </h1>
         <h2 className="text-2xl font-bold text-[color:var(--ink-light)] mt-2">
@@ -53,9 +74,12 @@ function Plaza() {
   const { topicId } = useParams();
   const nav = useNavigate();
   const topic = topics.find((t) => t.id === topicId);
-  const [messages, setMessages] = useState(topic?.chat || []);
+  const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [articles, setArticles] = useState([]);
+  const [facts, setFacts] = useState([]);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -65,6 +89,39 @@ function Plaza() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Fetch topic data from backend
+  useEffect(() => {
+    const fetchTopicData = async () => {
+      if (!topicId) return;
+      
+      try {
+        setIsLoading(true);
+        const response = await fetch(`${API_BASE_URL}/api/topic/${topicId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          setArticles(data.articles || []);
+          setFacts(data.facts || []);
+          setMessages(data.conversation || topic?.chat || []);
+        } else {
+          console.error('Failed to fetch topic data:', data.message);
+          // Fallback to static data
+          setMessages(topic?.chat || []);
+          setFacts(topic?.facts || []);
+        }
+      } catch (error) {
+        console.error('Error fetching topic data:', error);
+        // Fallback to static data
+        setMessages(topic?.chat || []);
+        setFacts(topic?.facts || []);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTopicData();
+  }, [topicId, topic]);
 
   if (!topic) {
     return (
@@ -92,88 +149,70 @@ function Plaza() {
     setInputValue("");
     setIsTyping(true);
 
-    // Simulate AI responses from different personas
-    setTimeout(() => {
-      const responses = generateResponses(inputValue, topic);
-      setMessages(prev => [...prev, ...responses]);
+    try {
+      // Send message to backend
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: inputValue.trim(),
+          topic: topicId,
+          history: messages
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setMessages(prev => [...prev, data.response]);
+      } else {
+        console.error('Failed to get AI response:', data.message);
+        // Fallback response
+        const fallbackResponse = {
+          id: Date.now() + 1,
+          speaker: "AI Assistant",
+          side: "left",
+          text: "I'm sorry, I'm having trouble processing your message right now. Please try again.",
+          timestamp: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, fallbackResponse]);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Fallback response
+      const fallbackResponse = {
+        id: Date.now() + 1,
+        speaker: "AI Assistant",
+        side: "left",
+        text: "I'm having trouble connecting to the server. Please try again later.",
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, fallbackResponse]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
-  const generateResponses = (userInput, topic) => {
-    const responses = [];
-    const personas = topic.chat.map(msg => msg.speaker);
-    
-    // Generate 1-2 responses from different personas
-    const numResponses = Math.random() > 0.5 ? 2 : 1;
-    const selectedPersonas = personas.sort(() => 0.5 - Math.random()).slice(0, numResponses);
-    
-    selectedPersonas.forEach((persona, index) => {
-      setTimeout(() => {
-        const response = generatePersonaResponse(userInput, persona, topic);
-        setMessages(prev => [...prev, response]);
-      }, (index + 1) * 1000);
-    });
 
-    return [];
-  };
-
-  const generatePersonaResponse = (userInput, persona, topic) => {
-    const responses = {
-      "Dr. Sarah Chen (Nature)": [
-        "Based on the latest research, that's a complex question with multiple factors at play.",
-        "The scientific evidence suggests we need to consider both short-term and long-term implications.",
-        "From a research perspective, this highlights the importance of peer-reviewed studies and data validation."
-      ],
-      "Mike Rodriguez (WSJ)": [
-        "From a business standpoint, this could have significant implications for market dynamics.",
-        "The economic data shows interesting trends that investors should be watching closely.",
-        "This development could impact various sectors differently, depending on implementation."
-      ],
-      "Dr. Elena Patel (Scientific American)": [
-        "The scientific community has been discussing this topic extensively, with some fascinating findings.",
-        "Recent studies have provided new insights that challenge some previous assumptions.",
-        "This is an area where interdisciplinary research is particularly valuable."
-      ],
-      "Leo (MIT Tech Review)": [
-        "The technological implications of this are quite significant and evolving rapidly.",
-        "From an innovation perspective, this represents both opportunities and challenges.",
-        "The tech industry is closely watching how this develops, given the potential impact on various sectors."
-      ],
-      "Rin (Financial Times)": [
-        "The financial markets are responding to this development with cautious optimism.",
-        "Investors are weighing the potential risks and rewards of this situation carefully.",
-        "This could have broader economic implications that we're only beginning to understand."
-      ],
-      "Zoe (Nature)": [
-        "The research community is actively investigating this phenomenon with rigorous methodologies.",
-        "Peer review processes are ensuring that findings are thoroughly validated before publication.",
-        "This represents an important area of scientific inquiry with significant potential impact."
-      ],
-      "Kai (AP)": [
-        "This is a developing story that we're continuing to monitor closely.",
-        "The facts are still emerging, and we're working to verify all information before reporting.",
-        "This situation requires careful fact-checking and multiple source verification."
-      ],
-      "Jules (FiveThirtyEight)": [
-        "The data suggests some interesting patterns that are worth analyzing further.",
-        "Statistical models are showing some surprising correlations that need deeper investigation.",
-        "This is a complex issue that requires careful data analysis and interpretation."
-      ]
-    };
-
-    const personaResponses = responses[persona] || ["That's an interesting perspective on this topic."];
-    const randomResponse = personaResponses[Math.floor(Math.random() * personaResponses.length)];
-    
-    return {
-      id: Date.now() + Math.random(),
-      speaker: persona,
-      side: "left",
-      text: randomResponse,
-      isUser: false,
-      timestamp: new Date().toISOString()
-    };
-  };
+  if (isLoading) {
+    return (
+      <main className="max-w-3xl mx-auto px-4 pt-8 pb-24">
+        <header className="mb-4">
+          <button onClick={() => nav(-1)} className="underline">← Back</button>
+          <h1 className="text-4xl md:text-5xl font-black leading-tight mt-3">
+            {topic.title}
+          </h1>
+        </header>
+        <div className="hr my-6"></div>
+        <div className="text-center py-10">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[color:var(--ink)] mx-auto"></div>
+          <p className="mt-4 text-[color:var(--ink-light)]">Loading latest news and perspectives...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="max-w-3xl mx-auto px-4 pt-8 pb-24">
@@ -189,13 +228,17 @@ function Plaza() {
 
       {/* Known facts */}
       <section aria-labelledby="facts" className="mb-10">
-        <h2 id="facts" className="text-xl font-black mb-3">Known facts</h2>
+        <h2 id="facts" className="text-xl font-black mb-3">Latest News Summary</h2>
         <ul className="space-y-2 text-[color:var(--ink-light)]">
-          {topic.facts.map((f, i) => (
+          {facts.length > 0 ? facts.map((f, i) => (
             <li key={i} className="pl-4 relative">
               <span className="absolute left-0 top-0">•</span>{f}
             </li>
-          ))}
+          )) : (
+            <li className="pl-4 relative">
+              <span className="absolute left-0 top-0">•</span>Loading recent news about this topic...
+            </li>
+          )}
         </ul>
       </section>
 
