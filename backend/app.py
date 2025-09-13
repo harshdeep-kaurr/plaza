@@ -405,8 +405,8 @@ def extract_subtopics(articles, topic_name):
     
     return subtopics[:8]  # Return top 8 subtopics
 
-def generate_conversation(articles, topic):
-    """Generate a casual texting conversation based on article opinions using Anthropic."""
+def generate_conversation(articles, topic, style="casual"):
+    """Generate a texting conversation based on article opinions using Anthropic."""
     if not articles:
         return []
     
@@ -431,33 +431,56 @@ Sentiment: {sentiment}
     
     context = f"Recent news articles about {topic}:\n" + "\n".join(article_contexts)
     
-    # Create casual conversation prompt
-    prompt = f"""
-You are creating a short casual texting conversation between different news sources discussing these articles.
-
-{context}
-
+    # Create conversation prompt based on style
+    if style == "genz":
+        style_instructions = """
+Create a Gen Z-style texting conversation (max one sentence per person) where each news source reacts to the articles with their typical perspective and tone. Use:
+- Gen Z slang, abbreviations, and emojis (ngl, ok but, bruh, etc.)
+- Casual language and modern expressions
+- Different perspectives from each source
+- References to the actual articles
+- Natural conversation flow
+- Max 6-8 messages total
+"""
+    else:  # casual style
+        style_instructions = """
 Create a casual, natural texting conversation (max one sentence per person) where each news source reacts to the articles with their typical perspective and tone. Use:
 - Casual, conversational language
 - Different perspectives from each source
 - References to the actual articles
 - Natural conversation flow
 - Max 6-8 messages total
+"""
 
-IMPORTANT: Return ONLY a valid JSON array in this exact format:
+    prompt = f"""
+You are creating a short texting conversation between different news sources discussing these articles.
+
+{context}
+
+{style_instructions}
+
+CRITICAL: You must return ONLY a valid JSON array. Follow this EXACT format:
 [
-  {{"speaker": "Source Name", "side": "left", "text": "message", "timestamp": "2024-01-15T10:30:00Z"}},
-  {{"speaker": "Another Source", "side": "left", "text": "another message", "timestamp": "2024-01-15T10:31:00Z"}}
+  {{"speaker": "Reuters", "side": "left", "text": "Your message here", "timestamp": "2024-01-15T10:30:00Z"}},
+  {{"speaker": "BBC News", "side": "left", "text": "Another message here", "timestamp": "2024-01-15T10:31:00Z"}}
 ]
 
-Make it sound like a natural, casual conversation about news - engaging and authentic.
+RULES:
+- Use double quotes for all strings
+- Escape any quotes inside text with backslash: \"
+- No trailing commas
+- Each message must have speaker, side, text, and timestamp
+- Keep text messages short (max one sentence)
+- Use actual news source names from the articles
+
+Return ONLY the JSON array, no other text.
 """
     
     try:
         if anthropic_client:
             response = anthropic_client.messages.create(
                 model="claude-3-haiku-20240307",
-                max_tokens=500,
+                max_tokens=800,
                 messages=[{"role": "user", "content": prompt}]
             )
             response_text = response.content[0].text.strip()
@@ -465,27 +488,76 @@ Make it sound like a natural, casual conversation about news - engaging and auth
             # Try to parse JSON response
             try:
                 import json
+                import re
+                
                 # Clean up the response text to extract JSON
                 if '[' in response_text and ']' in response_text:
                     start = response_text.find('[')
                     end = response_text.rfind(']') + 1
                     json_text = response_text[start:end]
-                    conversation = json.loads(json_text)
                 else:
-                    conversation = json.loads(response_text)
+                    json_text = response_text
                 
-                # Add timestamps if missing and ensure proper format
-                for i, msg in enumerate(conversation):
-                    if 'timestamp' not in msg:
-                        msg['timestamp'] = datetime.now().isoformat()
-                    if 'side' not in msg:
-                        msg['side'] = 'left'
+                # Fix common JSON issues
+                # Remove any trailing commas before closing brackets
+                json_text = re.sub(r',\s*\]', ']', json_text)
+                json_text = re.sub(r',\s*}', '}', json_text)
                 
-                return conversation
+                # Fix incomplete JSON by adding missing closing brackets
+                if json_text.count('[') > json_text.count(']'):
+                    json_text += ']'
+                if json_text.count('{') > json_text.count('}'):
+                    json_text += '}'
+                
+                # Fix unescaped quotes in text fields
+                json_text = re.sub(r'"text":\s*"([^"]*)"([^"]*)"([^"]*)"', r'"text": "\1\2\3"', json_text)
+                
+                # Try to parse the cleaned JSON
+                conversation = json.loads(json_text)
+                
+                # Validate and clean up the conversation
+                cleaned_conversation = []
+                for msg in conversation:
+                    if isinstance(msg, dict) and 'speaker' in msg and 'text' in msg:
+                        cleaned_msg = {
+                            'speaker': str(msg.get('speaker', 'Unknown')),
+                            'side': msg.get('side', 'left'),
+                            'text': str(msg.get('text', '')),
+                            'timestamp': msg.get('timestamp', datetime.now().isoformat())
+                        }
+                        cleaned_conversation.append(cleaned_msg)
+                
+                if cleaned_conversation:
+                    return cleaned_conversation
+                else:
+                    raise ValueError("No valid messages found in JSON")
+                    
             except (json.JSONDecodeError, ValueError) as e:
                 print(f"JSON parsing failed: {e}")
-                # If JSON parsing fails, create conversation from text
-                return create_fallback_conversation(response_text, articles)
+                print(f"Response text: {response_text[:500]}...")
+                
+                # Try to extract individual message objects from incomplete JSON
+                try:
+                    # Look for individual message objects in the response
+                    message_pattern = r'\{"speaker":\s*"([^"]+)",\s*"side":\s*"([^"]+)",\s*"text":\s*"([^"]+)",\s*"timestamp":\s*"([^"]+)"\}'
+                    matches = re.findall(message_pattern, response_text)
+                    
+                    if matches:
+                        conversation = []
+                        for speaker, side, text, timestamp in matches:
+                            conversation.append({
+                                "speaker": speaker,
+                                "side": side,
+                                "text": text,
+                                "timestamp": timestamp
+                            })
+                        if conversation:
+                            return conversation
+                except Exception as extract_error:
+                    print(f"Message extraction failed: {extract_error}")
+                
+                # If all else fails, create conversation from text
+                return create_fallback_conversation(response_text, articles, style)
                 
         elif OPENAI_API_KEY:
             # Fallback to OpenAI if Anthropic not available
@@ -496,47 +568,58 @@ Make it sound like a natural, casual conversation about news - engaging and auth
                 temperature=0.8
             )
             response_text = response.choices[0].message.content.strip()
-            return create_fallback_conversation(response_text, articles)
+            return create_fallback_conversation(response_text, articles, style)
         else:
             # No AI available, create basic conversation
-            return create_basic_conversation(articles, topic)
+            return create_basic_conversation(articles, topic, style)
             
     except Exception as e:
-        print(f"Error generating Gen Z conversation: {e}")
-        return create_basic_conversation(articles, topic)
+        print(f"Error generating conversation: {e}")
+        return create_basic_conversation(articles, topic, style)
 
-def create_fallback_conversation(response_text, articles):
+def create_fallback_conversation(response_text, articles, style="casual"):
     """Create conversation from AI response text when JSON parsing fails."""
-    # Extract potential messages from the response
-    lines = response_text.split('\n')
+    import re
+    
     conversation = []
     
-    # Simple extraction of quoted text or lines that look like messages
-    for i, line in enumerate(lines):
-        line = line.strip()
-        if line and ('"' in line or ':' in line) and len(line) > 10:
-            # Extract speaker and message
-            if ':' in line:
-                parts = line.split(':', 1)
-                if len(parts) == 2:
-                    speaker = parts[0].strip().replace('"', '').replace('*', '')
-                    message = parts[1].strip().replace('"', '')
-                    
-                    if len(message) > 5:  # Valid message
-                        conversation.append({
-                            "speaker": speaker,
-                            "side": "left",
-                            "text": message,
-                            "timestamp": datetime.now().isoformat()
-                        })
+    # Try to extract speaker and text from malformed JSON-like text
+    # Look for patterns like: {speaker: "Name", text: "message"}
+    speaker_text_pattern = r'\{?speaker[:\s]*["\']?([^"\'},]+)["\']?[,\s]*[^}]*text[:\s]*["\']([^"\'}]+)["\']?'
+    matches = re.findall(speaker_text_pattern, response_text, re.IGNORECASE)
+    
+    # If that doesn't work, try a more flexible pattern
+    if not matches:
+        # Look for speaker and text in separate lines or with different formatting
+        speaker_pattern = r'\{?speaker[:\s]*["\']?([^"\'},]+)["\']?'
+        text_pattern = r'text[:\s]*["\']([^"\'}]+)["\']?'
+        
+        speakers = re.findall(speaker_pattern, response_text, re.IGNORECASE)
+        texts = re.findall(text_pattern, response_text, re.IGNORECASE)
+        
+        # Match speakers with texts
+        for i in range(min(len(speakers), len(texts))):
+            matches.append((speakers[i], texts[i]))
+    
+    for speaker, text in matches:
+        speaker = speaker.strip().replace('{', '').replace('}', '')
+        text = text.strip().replace('{', '').replace('}', '')
+        
+        if len(speaker) > 2 and len(text) > 5:
+            conversation.append({
+                "speaker": speaker,
+                "side": "left", 
+                "text": text,
+                "timestamp": datetime.now().isoformat()
+            })
     
     # If we didn't get enough messages, add some basic ones
     if len(conversation) < 3:
-        conversation.extend(create_basic_conversation(articles, "news")[:3-len(conversation)])
+        conversation.extend(create_basic_conversation(articles, "news", style)[:3-len(conversation)])
     
     return conversation[:6]  # Max 6 messages
 
-def create_basic_conversation(articles, topic):
+def create_basic_conversation(articles, topic, style="casual"):
     """Create a basic conversation when AI is not available."""
     if not articles:
         return []
@@ -547,25 +630,40 @@ def create_basic_conversation(articles, topic):
         sources = ['TechCrunch', 'Reuters', 'Associated Press', 'Wall Street Journal'][:len(sources)+2]
     
     conversation = []
-    casual_responses = [
-        "This is really interesting stuff",
-        "I'm not sure what to make of this",
-        "This seems concerning to me",
-        "Why isn't this getting more attention?",
-        "This is actually pretty fascinating",
-        "This is crazy news",
-        "What does this mean for everyone?",
-        "This is making me worried",
-        "This is actually a big deal",
-        "This is pretty exciting news"
-    ]
+    
+    if style == "genz":
+        responses = [
+            "ok but this is actually wild 😳",
+            "ngl this is giving me mixed feelings",
+            "wait this is lowkey concerning",
+            "ok but why is no one talking about this??",
+            "this is actually so interesting",
+            "bruh this is crazy",
+            "ok but what does this mean for us tho",
+            "this is giving me anxiety ngl",
+            "wait this is actually a big deal",
+            "ok but this is lowkey exciting"
+        ]
+    else:  # casual style
+        responses = [
+            "This is really interesting stuff",
+            "I'm not sure what to make of this",
+            "This seems concerning to me",
+            "Why isn't this getting more attention?",
+            "This is actually pretty fascinating",
+            "This is crazy news",
+            "What does this mean for everyone?",
+            "This is making me worried",
+            "This is actually a big deal",
+            "This is pretty exciting news"
+        ]
     
     for i, source in enumerate(sources[:4]):
-        if i < len(casual_responses):
+        if i < len(responses):
             conversation.append({
                 "speaker": source,
                 "side": "left",
-                "text": casual_responses[i],
+                "text": responses[i],
                 "timestamp": datetime.now().isoformat()
             })
     
@@ -713,6 +811,9 @@ def get_subtopics(topic_name):
 def get_subtopic_data(topic_name, subtopic_id):
     """Get articles and conversation for a specific subtopic."""
     try:
+        # Get conversation style from query parameter
+        style = request.args.get('style', 'casual')
+        
         # Fetch articles for the main topic
         articles = fetch_news_articles(query=topic_name, days_back=7, page_size=50)
         processed_articles = process_articles(articles)
@@ -739,8 +840,8 @@ def get_subtopic_data(topic_name, subtopic_id):
         # Get articles for this specific subtopic
         subtopic_articles = target_subtopic.get('articles', [])
         
-        # Generate conversation for this subtopic
-        conversation = generate_conversation(subtopic_articles, target_subtopic['title'])
+        # Generate conversation for this subtopic with the specified style
+        conversation = generate_conversation(subtopic_articles, target_subtopic['title'], style)
         
         return jsonify({
             'success': True,
@@ -768,6 +869,7 @@ def chat_endpoint():
         subtopic = data.get('subtopic', '')
         articles = data.get('articles', [])
         conversation_history = data.get('history', [])
+        style = data.get('style', 'casual')
         
         if not user_message:
             return jsonify({
@@ -805,6 +907,12 @@ def chat_endpoint():
         if history_context:
             full_context += f"\nRecent conversation:\n{history_context}"
         
+        # Create style-specific instructions
+        if style == "genz":
+            style_instruction = "Respond in a Gen Z texting style (max one sentence) with your perspective on this topic. Use Gen Z slang, abbreviations, and emojis if appropriate."
+        else:  # casual style
+            style_instruction = "Respond in a casual, conversational style (max one sentence) with your perspective on this topic. Use natural, friendly language that's easy to understand."
+        
         prompt = f"""
         You are {selected_persona}, {persona['background']}.
         Your perspective: {persona['perspective']}
@@ -815,8 +923,7 @@ def chat_endpoint():
         
         User's question: {user_message}
         
-        Respond in a casual, conversational style (max one sentence) with your perspective on this topic.
-        Use natural, friendly language that's easy to understand.
+        {style_instruction}
         If there are relevant articles mentioned in the context, reference them briefly.
         Be authentic to your background but keep it conversational and engaging.
         """
@@ -838,10 +945,16 @@ def chat_endpoint():
                 )
                 ai_response = response.choices[0].message.content.strip()
             else:
-                ai_response = f"This is actually pretty interesting from my perspective as {persona['background']}"
+                if style == "genz":
+                    ai_response = f"ngl this is actually pretty interesting from my perspective as {persona['background']} 🤔"
+                else:
+                    ai_response = f"This is actually pretty interesting from my perspective as {persona['background']}"
         except Exception as e:
             print(f"Error generating AI response: {e}")
-            ai_response = "This is a complex topic but I'm having some technical difficulties right now"
+            if style == "genz":
+                ai_response = "ngl this is a complex topic but i'm having some technical difficulties rn 😅"
+            else:
+                ai_response = "This is a complex topic but I'm having some technical difficulties right now"
         
         return jsonify({
             'success': True,

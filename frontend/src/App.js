@@ -197,6 +197,7 @@ function SubPlaza() {
   const [isLoading, setIsLoading] = useState(true);
   const [articles, setArticles] = useState([]);
   const [subtopic, setSubtopic] = useState(null);
+  const [conversationStyle, setConversationStyle] = useState("casual");
   const messagesEndRef = useRef(null);
 
   // Debug environment variables
@@ -223,7 +224,7 @@ function SubPlaza() {
       try {
         setIsLoading(true);
         
-        const response = await fetch(`${API_BASE_URL}/api/subtopic/${topic.category}/${subtopicId}`);
+        const response = await fetch(`${API_BASE_URL}/api/subtopic/${topic.category}/${subtopicId}?style=${conversationStyle}`);
         
         if (!response.ok) {
           throw new Error(`Backend API error: ${response.status}`);
@@ -255,7 +256,7 @@ function SubPlaza() {
     };
 
     fetchSubtopicData();
-  }, [topicId, subtopicId, topic]);
+  }, [topicId, subtopicId, topic, conversationStyle]);
 
 
   if (!topic) {
@@ -296,7 +297,8 @@ function SubPlaza() {
           topic: topic?.title || '',
           subtopic: subtopic?.title || '',
           articles: articles,
-          history: messages.slice(-5) // Last 5 messages for context
+          history: messages.slice(-5), // Last 5 messages for context
+          style: conversationStyle
         })
       });
 
@@ -394,7 +396,23 @@ function SubPlaza() {
 
       {/* Chat area */}
       <section aria-labelledby="chat">
-        <h2 id="chat" className="text-xl font-black mb-4">Conversation</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 id="chat" className="text-xl font-black">Conversation</h2>
+          <div className="flex items-center gap-2">
+            <label htmlFor="style-select" className="text-sm text-[color:var(--ink-light)]">
+              Style:
+            </label>
+            <select
+              id="style-select"
+              value={conversationStyle}
+              onChange={(e) => setConversationStyle(e.target.value)}
+              className="px-3 py-1 border border-[color:var(--rule)] rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="casual">Casual</option>
+              <option value="genz">Gen Z</option>
+            </select>
+          </div>
+        </div>
         <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
           {messages.map((m, i) => (
             <div key={m.id || i} className={`flex ${m.side === "left" ? "justify-start" : "justify-end"}`}>
