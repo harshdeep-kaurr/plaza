@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Climate Change",
+    "description": "Environmental policies, global warming, and sustainability initiatives",
+    "category": "environment"
+  },
+  {
+    "name": "Artificial Intelligence",
+    "description": "AI developments, machine learning, and technology ethics",
+    "category": "technology"
+  },
+  {
+    "name": "Healthcare Policy",
+    "description": "Medical reforms, public health, and healthcare access",
+    "category": "health"
+  },
+  {
+    "name": "Economic Policy",
+    "description": "Fiscal policies, trade agreements, and economic indicators",
+    "category": "economics"
+  },
+  {
+    "name": "Education Reform",
+    "description": "School policies, curriculum changes, and educational funding",
+    "category": "education"
+  },
+  {
+    "name": "Immigration",
+    "description": "Border policies, visa programs, and immigration reform",
+    "category": "politics"
+  },
+  {
+    "name": "Social Justice",
+    "description": "Civil rights, equality movements, and social reform",
+    "category": "society"
+  },
+  {
+    "name": "Cybersecurity",
+    "description": "Data protection, privacy laws, and digital security",
+    "category": "technology"
+  }
+]
