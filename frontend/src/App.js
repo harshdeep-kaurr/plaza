@@ -29,10 +29,10 @@ function Home() {
             <circle cx="10" cy="14" r="1" fill="currentColor"/>
             <circle cx="14" cy="14" r="1" fill="currentColor"/>
           </svg>
-          Plaza
+          PLAZA
         </h1>
-        <h2 className="text-2xl font-bold text-[color:var(--ink-light)] mt-2">
-          Where Headlines Become Conversations
+        <h2 className="text-2xl font-bold italic text-[color:var(--ink-light)] mt-2">
+          Where headlines become conversations.
         </h2>
         <div className="hr my-6"></div>
         <p className="text-lg text-[color:var(--ink-light)] max-w-3xl">
@@ -201,6 +201,7 @@ function SubPlaza() {
   const [articles, setArticles] = useState([]);
   const [subtopic, setSubtopic] = useState(null);
   const [conversationStyle, setConversationStyle] = useState("casual");
+  const [isPlaying, setIsPlaying] = useState(false);
   const messagesEndRef = useRef(null);
 
   // Debug environment variables
@@ -211,6 +212,69 @@ function SubPlaza() {
   console.log('REACT_APP_NEWS_API_KEY value:', process.env.REACT_APP_NEWS_API_KEY);
   console.log('========================');
 
+  // Simple text-to-speech functionality
+  const speakConversation = async () => {
+    console.log('Play button clicked!', { isPlaying, messagesLength: messages?.length });
+    
+    if (isPlaying) {
+      // Stop current speech
+      console.log('Stopping speech...');
+      setIsPlaying(false);
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      return;
+    }
+
+    if (!messages || messages.length === 0) {
+      console.log('No messages to speak');
+      return;
+    }
+
+    if (!window.speechSynthesis) {
+      console.error('Web Speech API not supported');
+      alert('Text-to-speech is not supported in this browser');
+      return;
+    }
+
+    console.log('Starting speech...');
+    setIsPlaying(true);
+    let currentIndex = 0;
+
+    const speakNextMessage = () => {
+      console.log(`Speaking message ${currentIndex + 1}/${messages.length}`);
+      if (currentIndex >= messages.length) {
+        console.log('Finished speaking all messages');
+        setIsPlaying(false);
+        return;
+      }
+
+      const message = messages[currentIndex];
+      const textToSpeak = `${message.speaker} says: ${message.text}`;
+      console.log('Speaking:', textToSpeak);
+
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+      utterance.volume = 0.8;
+      
+      utterance.onend = () => {
+        console.log('Message ended, moving to next');
+        currentIndex++;
+        setTimeout(speakNextMessage, 500);
+      };
+      
+      utterance.onerror = (error) => {
+        console.error('Speech synthesis error:', error);
+        setIsPlaying(false);
+      };
+      
+      window.speechSynthesis.speak(utterance);
+    };
+
+    speakNextMessage();
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -218,6 +282,18 @@ function SubPlaza() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Cleanup speech synthesis when component unmounts
+  useEffect(() => {
+    return () => {
+      // Stop any ongoing speech
+      setIsPlaying(false);
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
 
   // Simple bias analysis based on content
   const analyzeContentBias = (text) => {
@@ -482,6 +558,31 @@ function SubPlaza() {
                 <option value="genz">Gen Z</option>
               </select>
             </div>
+            <button
+              onClick={speakConversation}
+              className={`flex items-center gap-2 px-3 py-1 rounded text-sm transition-colors ${
+                isPlaying 
+                  ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+              }`}
+              title={isPlaying ? "Stop reading conversation" : "Read conversation aloud"}
+            >
+              {isPlaying ? (
+                <>
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1zm4 0a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Stop
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                  </svg>
+                  Play
+                </>
+              )}
+            </button>
           </div>
         </div>
         <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">

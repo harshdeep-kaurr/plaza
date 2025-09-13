@@ -1118,6 +1118,7 @@ def get_article_bias(article_id):
             'message': f'Error analyzing bias: {str(e)}'
         }), 500
 
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint."""
