@@ -216,6 +216,50 @@ function SubPlaza() {
     scrollToBottom();
   }, [messages]);
 
+  // Simple bias analysis based on content
+  const analyzeContentBias = (text) => {
+    if (!text) return 0;
+
+    const textLower = text.toLowerCase();
+    let biasScore = 0;
+
+    // Simple bias indicators
+    const biasWords = [
+      'outrageous', 'shocking', 'devastating', 'terrible', 'awful', 'horrible',
+      'clearly', 'obviously', 'undoubtedly', 'certainly', 'definitely',
+      'i believe', 'i think', 'in my opinion', 'personally', 'i feel',
+      'finally', 'not surprisingly', 'of course', 'unfortunately', 'sadly',
+      'very', 'extremely', 'incredibly', 'absolutely', 'completely'
+    ];
+
+    // Count bias words
+    biasWords.forEach(word => {
+      if (textLower.includes(word)) {
+        biasScore += 0.1;
+      }
+    });
+
+    // Check for punctuation
+    const questionMarks = (text.match(/\?/g) || []).length;
+    const exclamationMarks = (text.match(/!/g) || []).length;
+    biasScore += (questionMarks + exclamationMarks) * 0.05;
+
+    return Math.min(1, biasScore);
+  };
+
+  // Get bias shading based on content analysis
+  const getBiasShading = (text) => {
+    const biasIntensity = analyzeContentBias(text);
+    
+    // Return opacity based on bias (0.1 = very light, 0.9 = very dark)
+    const opacity = 0.1 + (biasIntensity * 0.8);
+    
+    return {
+      backgroundColor: `rgba(107, 114, 128, ${opacity})`, // Grey with varying opacity
+      borderColor: `rgba(107, 114, 128, ${opacity + 0.2})`
+    };
+  };
+
   // Fetch subtopic data
   useEffect(() => {
     const fetchSubtopicData = async () => {
@@ -398,37 +442,92 @@ function SubPlaza() {
       <section aria-labelledby="chat">
         <div className="flex justify-between items-center mb-4">
           <h2 id="chat" className="text-xl font-black">Conversation</h2>
-          <div className="flex items-center gap-2">
-            <label htmlFor="style-select" className="text-sm text-[color:var(--ink-light)]">
-              Style:
-            </label>
-            <select
-              id="style-select"
-              value={conversationStyle}
-              onChange={(e) => setConversationStyle(e.target.value)}
-              className="px-3 py-1 border border-[color:var(--rule)] rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="casual">Casual</option>
-              <option value="genz">Gen Z</option>
-            </select>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-4 h-2 rounded" style={{backgroundColor: 'rgba(107, 114, 128, 0.1)'}}></div>
+                <span className="text-[color:var(--ink-light)]">Neutral</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-4 h-2 rounded" style={{backgroundColor: 'rgba(107, 114, 128, 0.3)'}}></div>
+                <span className="text-[color:var(--ink-light)]">Light</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-4 h-2 rounded" style={{backgroundColor: 'rgba(107, 114, 128, 0.5)'}}></div>
+                <span className="text-[color:var(--ink-light)]">Medium</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-4 h-2 rounded" style={{backgroundColor: 'rgba(107, 114, 128, 0.7)'}}></div>
+                <span className="text-[color:var(--ink-light)]">High</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-4 h-2 rounded" style={{backgroundColor: 'rgba(107, 114, 128, 0.9)'}}></div>
+                <span className="text-[color:var(--ink-light)]">Very High</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <label htmlFor="style-select" className="text-sm text-[color:var(--ink-light)]">
+                Style:
+              </label>
+              <select
+                id="style-select"
+                value={conversationStyle}
+                onChange={(e) => setConversationStyle(e.target.value)}
+                className="px-3 py-1 border border-[color:var(--rule)] rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="casual">Casual</option>
+                <option value="genz">Gen Z</option>
+              </select>
+            </div>
           </div>
         </div>
         <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
-          {messages.map((m, i) => (
-            <div key={m.id || i} className={`flex ${m.side === "left" ? "justify-start" : "justify-end"}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-3 border text-sm leading-6
-                              ${m.side === "left" ? "bg-white" : "bg-[#f4f3f1]"} 
-                              border-[color:var(--rule)]`}>
-                <div className="font-bold mb-1">{m.speaker}</div>
-                <p className="text-[color:var(--ink-light)]">{m.text}</p>
-                {m.source && (
-                  <div className="mt-2 text-xs text-[color:var(--ink-light)]">
-                    Source: <a className="underline" href={m.source} target="_blank" rel="noreferrer">link</a>
-                  </div>
-                )}
+          {messages.map((m, i) => {
+            // Get bias shading for the message
+            const biasShading = getBiasShading(m.text);
+            
+            return (
+              <div key={m.id || i} className={`flex ${m.side === "left" ? "justify-start" : "justify-end"}`}>
+                <div 
+                  className="max-w-[85%] rounded-2xl px-4 py-3 border text-sm leading-6"
+                  style={{
+                    backgroundColor: m.side === "left" ? biasShading.backgroundColor : "#f4f3f1",
+                    borderColor: m.side === "left" ? biasShading.borderColor : "#e6e4e0"
+                  }}
+                >
+                  <div className="font-bold mb-1">{m.speaker}</div>
+                  <p className="text-[color:var(--ink-light)]">{m.text}</p>
+                  {m.source_url && (
+                    <div className="mt-2 text-xs text-[color:var(--ink-light)] group relative">
+                      <span className="underline cursor-pointer hover:text-blue-600 transition-colors">
+                        Source
+                      </span>
+                      <div className="absolute bottom-full left-0 mb-2 w-80 bg-white border border-gray-300 rounded-lg shadow-lg p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                        <div className="text-sm font-semibold text-gray-800 mb-2">
+                          {m.speaker}
+                        </div>
+                        <div className="text-xs text-gray-600 mb-2">
+                          <a 
+                            href={m.source_url} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="text-blue-600 hover:text-blue-800 underline"
+                          >
+                            {m.source_url}
+                          </a>
+                        </div>
+                        {m.quote && (
+                          <div className="text-xs text-gray-700 italic border-l-2 border-gray-300 pl-2">
+                            "{m.quote}"
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {isTyping && (
             <div className="flex justify-start">
               <div className="max-w-[85%] rounded-2xl px-4 py-3 border text-sm leading-6 bg-white border-[color:var(--rule)]">

@@ -405,6 +405,25 @@ def extract_subtopics(articles, topic_name):
     
     return subtopics[:8]  # Return top 8 subtopics
 
+def clean_json_string(json_str):
+    """Clean JSON string to remove control characters and fix common issues."""
+    import re
+    
+    # Remove control characters that break JSON parsing
+    json_str = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]', '', json_str)
+    
+    # Replace unescaped newlines, tabs, and carriage returns
+    json_str = json_str.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+    
+    # Fix common JSON issues
+    json_str = re.sub(r',\s*\]', ']', json_str)  # Remove trailing commas before ]
+    json_str = re.sub(r',\s*}', '}', json_str)   # Remove trailing commas before }
+    
+    # Fix unescaped quotes in string values
+    json_str = re.sub(r'"text":\s*"([^"]*)"([^"]*)"([^"]*)"', r'"text": "\1\2\3"', json_str)
+    
+    return json_str
+
 def generate_conversation(articles, topic, style="casual"):
     """Generate a texting conversation based on article opinions using Anthropic."""
     if not articles:
@@ -425,6 +444,7 @@ def generate_conversation(articles, topic, style="casual"):
         article_contexts.append(f"""
 Article: {title}
 Source: {source}
+URL: {article.get('url', '')}
 Content: {description[:300]}...
 Sentiment: {sentiment}
 """)
@@ -461,17 +481,20 @@ You are creating a short texting conversation between different news sources dis
 
 CRITICAL: You must return ONLY a valid JSON array. Follow this EXACT format:
 [
-  {{"speaker": "Reuters", "side": "left", "text": "Your message here", "timestamp": "2024-01-15T10:30:00Z"}},
-  {{"speaker": "BBC News", "side": "left", "text": "Another message here", "timestamp": "2024-01-15T10:31:00Z"}}
+  {{"speaker": "Reuters", "side": "left", "text": "Your message here", "timestamp": "2024-01-15T10:30:00Z", "source_url": "https://example.com", "quote": "Relevant quote from the article"}},
+  {{"speaker": "BBC News", "side": "right", "text": "Another message here", "timestamp": "2024-01-15T10:31:00Z", "source_url": "https://example.com", "quote": "Another relevant quote"}}
 ]
 
 RULES:
 - Use double quotes for all strings
 - Escape any quotes inside text with backslash: \"
 - No trailing commas
-- Each message must have speaker, side, text, and timestamp
+- Each message must have speaker, side, text, timestamp, source_url, and quote
 - Keep text messages short (max one sentence)
 - Use actual news source names from the articles
+- For source_url, use the actual URL from the article context
+- For quote, extract a relevant 1-2 sentence quote from the article content that supports the speaker's perspective
+- Alternate the "side" field between "left" and "right" for each message to create a natural conversation flow
 
 Return ONLY the JSON array, no other text.
 """
@@ -498,32 +521,31 @@ Return ONLY the JSON array, no other text.
                 else:
                     json_text = response_text
                 
-                # Fix common JSON issues
-                # Remove any trailing commas before closing brackets
-                json_text = re.sub(r',\s*\]', ']', json_text)
-                json_text = re.sub(r',\s*}', '}', json_text)
-                
                 # Fix incomplete JSON by adding missing closing brackets
                 if json_text.count('[') > json_text.count(']'):
                     json_text += ']'
                 if json_text.count('{') > json_text.count('}'):
                     json_text += '}'
                 
-                # Fix unescaped quotes in text fields
-                json_text = re.sub(r'"text":\s*"([^"]*)"([^"]*)"([^"]*)"', r'"text": "\1\2\3"', json_text)
+                # Clean the JSON string using our helper function
+                json_text = clean_json_string(json_text)
                 
                 # Try to parse the cleaned JSON
                 conversation = json.loads(json_text)
                 
                 # Validate and clean up the conversation
                 cleaned_conversation = []
-                for msg in conversation:
+                for i, msg in enumerate(conversation):
                     if isinstance(msg, dict) and 'speaker' in msg and 'text' in msg:
+                        # Alternate between left and right sides for AI messages
+                        side = 'right' if i % 2 == 1 else 'left'
                         cleaned_msg = {
                             'speaker': str(msg.get('speaker', 'Unknown')),
-                            'side': msg.get('side', 'left'),
+                            'side': side,
                             'text': str(msg.get('text', '')),
-                            'timestamp': msg.get('timestamp', datetime.now().isoformat())
+                            'timestamp': msg.get('timestamp', datetime.now().isoformat()),
+                            'source_url': str(msg.get('source_url', '')),
+                            'quote': str(msg.get('quote', ''))
                         }
                         cleaned_conversation.append(cleaned_msg)
                 
@@ -535,24 +557,41 @@ Return ONLY the JSON array, no other text.
             except (json.JSONDecodeError, ValueError) as e:
                 print(f"JSON parsing failed: {e}")
                 print(f"Response text: {response_text[:500]}...")
+                print(f"Cleaned JSON text: {json_text[:500]}...")
                 
                 # Try to extract individual message objects from incomplete JSON
                 try:
-                    # Look for individual message objects in the response
-                    message_pattern = r'\{"speaker":\s*"([^"]+)",\s*"side":\s*"([^"]+)",\s*"text":\s*"([^"]+)",\s*"timestamp":\s*"([^"]+)"\}'
-                    matches = re.findall(message_pattern, response_text)
+                    # Look for individual message objects in the response with more flexible patterns
+                    message_patterns = [
+                        r'\{"speaker":\s*"([^"]+)",\s*"side":\s*"([^"]+)",\s*"text":\s*"([^"]+)",\s*"timestamp":\s*"([^"]+)"\}',
+                        r'"speaker":\s*"([^"]+)"[^}]*"text":\s*"([^"]+)"',
+                        r'speaker[:\s]*["\']?([^"\'},]+)["\']?[^}]*text[:\s]*["\']([^"\'}]+)["\']?'
+                    ]
                     
-                    if matches:
-                        conversation = []
-                        for speaker, side, text, timestamp in matches:
-                            conversation.append({
-                                "speaker": speaker,
-                                "side": side,
-                                "text": text,
-                                "timestamp": timestamp
-                            })
-                        if conversation:
-                            return conversation
+                    conversation = []
+                    for pattern in message_patterns:
+                        matches = re.findall(pattern, response_text, re.IGNORECASE | re.DOTALL)
+                        if matches:
+                            for i, match in enumerate(matches):
+                                if len(match) >= 2:
+                                    speaker = match[0].strip()
+                                    text = match[1].strip()
+                                    if len(speaker) > 1 and len(text) > 5:
+                                        # Alternate between left and right sides
+                                        side = 'right' if i % 2 == 1 else 'left'
+                                        conversation.append({
+                                            "speaker": speaker,
+                                            "side": side,
+                                            "text": text,
+                                            "timestamp": datetime.now().isoformat(),
+                                            "source_url": "",
+                                            "quote": ""
+                                        })
+                            if conversation:
+                                break
+                    
+                    if conversation:
+                        return conversation
                 except Exception as extract_error:
                     print(f"Message extraction failed: {extract_error}")
                 
@@ -601,14 +640,16 @@ def create_fallback_conversation(response_text, articles, style="casual"):
         for i in range(min(len(speakers), len(texts))):
             matches.append((speakers[i], texts[i]))
     
-    for speaker, text in matches:
+    for i, (speaker, text) in enumerate(matches):
         speaker = speaker.strip().replace('{', '').replace('}', '')
         text = text.strip().replace('{', '').replace('}', '')
         
         if len(speaker) > 2 and len(text) > 5:
+            # Alternate between left and right sides
+            side = 'right' if i % 2 == 1 else 'left'
             conversation.append({
                 "speaker": speaker,
-                "side": "left", 
+                "side": side, 
                 "text": text,
                 "timestamp": datetime.now().isoformat()
             })
@@ -660,11 +701,15 @@ def create_basic_conversation(articles, topic, style="casual"):
     
     for i, source in enumerate(sources[:4]):
         if i < len(responses):
+            # Alternate between left and right sides
+            side = 'right' if i % 2 == 1 else 'left'
             conversation.append({
                 "speaker": source,
-                "side": "left",
+                "side": side,
                 "text": responses[i],
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "source_url": "",
+                "quote": ""
             })
     
     return conversation
@@ -956,13 +1001,23 @@ def chat_endpoint():
             else:
                 ai_response = "This is a complex topic but I'm having some technical difficulties right now"
         
+        # Find a relevant article for source information
+        source_url = ""
+        quote = ""
+        if articles:
+            # Use the first article as the source
+            source_url = articles[0].get('url', '')
+            quote = articles[0].get('description', '')[:200] + "..." if articles[0].get('description') else ""
+        
         return jsonify({
             'success': True,
             'response': {
                 'speaker': selected_persona,
                 'side': 'left',
                 'text': ai_response,
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now().isoformat(),
+                'source_url': source_url,
+                'quote': quote
             }
         })
         
