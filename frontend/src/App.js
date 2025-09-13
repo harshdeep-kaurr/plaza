@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Routes, Route, Link, useParams, useNavigate } from "react-router-dom";
 import topics from "./data/topics";
 
@@ -53,6 +53,18 @@ function Plaza() {
   const { topicId } = useParams();
   const nav = useNavigate();
   const topic = topics.find((t) => t.id === topicId);
+  const [messages, setMessages] = useState(topic?.chat || []);
+  const [inputValue, setInputValue] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   if (!topic) {
     return (
@@ -62,6 +74,106 @@ function Plaza() {
       </main>
     );
   }
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!inputValue.trim() || isTyping) return;
+
+    const userMessage = {
+      id: Date.now(),
+      speaker: "You",
+      side: "right",
+      text: inputValue.trim(),
+      isUser: true,
+      timestamp: new Date().toISOString()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue("");
+    setIsTyping(true);
+
+    // Simulate AI responses from different personas
+    setTimeout(() => {
+      const responses = generateResponses(inputValue, topic);
+      setMessages(prev => [...prev, ...responses]);
+      setIsTyping(false);
+    }, 1500);
+  };
+
+  const generateResponses = (userInput, topic) => {
+    const responses = [];
+    const personas = topic.chat.map(msg => msg.speaker);
+    
+    // Generate 1-2 responses from different personas
+    const numResponses = Math.random() > 0.5 ? 2 : 1;
+    const selectedPersonas = personas.sort(() => 0.5 - Math.random()).slice(0, numResponses);
+    
+    selectedPersonas.forEach((persona, index) => {
+      setTimeout(() => {
+        const response = generatePersonaResponse(userInput, persona, topic);
+        setMessages(prev => [...prev, response]);
+      }, (index + 1) * 1000);
+    });
+
+    return [];
+  };
+
+  const generatePersonaResponse = (userInput, persona, topic) => {
+    const responses = {
+      "Dr. Sarah Chen (Nature)": [
+        "Based on the latest research, that's a complex question with multiple factors at play.",
+        "The scientific evidence suggests we need to consider both short-term and long-term implications.",
+        "From a research perspective, this highlights the importance of peer-reviewed studies and data validation."
+      ],
+      "Mike Rodriguez (WSJ)": [
+        "From a business standpoint, this could have significant implications for market dynamics.",
+        "The economic data shows interesting trends that investors should be watching closely.",
+        "This development could impact various sectors differently, depending on implementation."
+      ],
+      "Dr. Elena Patel (Scientific American)": [
+        "The scientific community has been discussing this topic extensively, with some fascinating findings.",
+        "Recent studies have provided new insights that challenge some previous assumptions.",
+        "This is an area where interdisciplinary research is particularly valuable."
+      ],
+      "Leo (MIT Tech Review)": [
+        "The technological implications of this are quite significant and evolving rapidly.",
+        "From an innovation perspective, this represents both opportunities and challenges.",
+        "The tech industry is closely watching how this develops, given the potential impact on various sectors."
+      ],
+      "Rin (Financial Times)": [
+        "The financial markets are responding to this development with cautious optimism.",
+        "Investors are weighing the potential risks and rewards of this situation carefully.",
+        "This could have broader economic implications that we're only beginning to understand."
+      ],
+      "Zoe (Nature)": [
+        "The research community is actively investigating this phenomenon with rigorous methodologies.",
+        "Peer review processes are ensuring that findings are thoroughly validated before publication.",
+        "This represents an important area of scientific inquiry with significant potential impact."
+      ],
+      "Kai (AP)": [
+        "This is a developing story that we're continuing to monitor closely.",
+        "The facts are still emerging, and we're working to verify all information before reporting.",
+        "This situation requires careful fact-checking and multiple source verification."
+      ],
+      "Jules (FiveThirtyEight)": [
+        "The data suggests some interesting patterns that are worth analyzing further.",
+        "Statistical models are showing some surprising correlations that need deeper investigation.",
+        "This is a complex issue that requires careful data analysis and interpretation."
+      ]
+    };
+
+    const personaResponses = responses[persona] || ["That's an interesting perspective on this topic."];
+    const randomResponse = personaResponses[Math.floor(Math.random() * personaResponses.length)];
+    
+    return {
+      id: Date.now() + Math.random(),
+      speaker: persona,
+      side: "left",
+      text: randomResponse,
+      isUser: false,
+      timestamp: new Date().toISOString()
+    };
+  };
 
   return (
     <main className="max-w-3xl mx-auto px-4 pt-8 pb-24">
@@ -91,10 +203,10 @@ function Plaza() {
 
       {/* Chat area */}
       <section aria-labelledby="chat">
-        <h2 id="chat" className="sr-only">Conversation</h2>
-        <div className="space-y-4">
-          {topic.chat.map((m, i) => (
-            <div key={i} className={`flex ${m.side === "left" ? "justify-start" : "justify-end"}`}>
+        <h2 id="chat" className="text-xl font-black mb-4">Conversation</h2>
+        <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
+          {messages.map((m, i) => (
+            <div key={m.id || i} className={`flex ${m.side === "left" ? "justify-start" : "justify-end"}`}>
               <div className={`max-w-[85%] rounded-2xl px-4 py-3 border text-sm leading-6
                               ${m.side === "left" ? "bg-white" : "bg-[#f4f3f1]"} 
                               border-[color:var(--rule)]`}>
@@ -108,7 +220,39 @@ function Plaza() {
               </div>
             </div>
           ))}
+          {isTyping && (
+            <div className="flex justify-start">
+              <div className="max-w-[85%] rounded-2xl px-4 py-3 border text-sm leading-6 bg-white border-[color:var(--rule)]">
+                <div className="font-bold mb-1">Someone is typing...</div>
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
         </div>
+
+        {/* Chat input */}
+        <form onSubmit={handleSendMessage} className="flex gap-2">
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="Ask a question or share your thoughts..."
+            className="flex-1 px-4 py-3 border border-[color:var(--rule)] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            disabled={isTyping}
+          />
+          <button
+            type="submit"
+            disabled={!inputValue.trim() || isTyping}
+            className="px-6 py-3 bg-[color:var(--ink)] text-white rounded-lg hover:bg-[color:var(--ink-light)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Send
+          </button>
+        </form>
       </section>
 
       {/* bottom spacer so chat isn't cramped on mobile */}
