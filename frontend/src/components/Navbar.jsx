@@ -6,8 +6,8 @@ const Navbar = ({ onNavigate, currentPage }) => {
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
-            <h1 className="text-xl font-bold text-gray-800">
-              Plaza
+            <h1 className="text-2xl font-bold text-purple-800">
+              PLAZA
             </h1>
           </div>
           
