@@ -1,11 +1,9 @@
-// Replace images with your own or remote URLs.
-// Keep ids URL-safe (used in /plaza/:id routes).
 const topics = [
     {
       id: "business",
       title: "Business",
       category: "business",
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=1200&auto=format&fit=crop",
+      image: "https://plus.unsplash.com/premium_photo-1672423154405-5fd922c11af2?q=80&w=1770&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
       facts: [],
       chat: []
     },
@@ -13,7 +11,7 @@ const topics = [
       id: "entertainment",
       title: "Entertainment",
       category: "entertainment",
-      image: "https://images.unsplash.com/photo-1489599808417-4b0b0b0b0b0b?q=80&w=1200&auto=format&fit=crop",
+      image: "https://images.unsplash.com/photo-1603190287605-e6ade32fa852?q=80&w=1770&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
       facts: [],
       chat: []
     },
@@ -21,7 +19,7 @@ const topics = [
       id: "general",
       title: "Politics",
       category: "general",
-      image: "https://images.unsplash.com/photo-1504711331083-9c895941bf81?q=80&w=1200&auto=format&fit=crop",
+      image: "https://images.unsplash.com/photo-1545690546-4bb50b0a3c15?q=80&w=1771&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
       facts: [],
       chat: []
     },
@@ -29,7 +27,7 @@ const topics = [
       id: "health",
       title: "Health",
       category: "health",
-      image: "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?q=80&w=1200&auto=format&fit=crop",
+      image: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=2120&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
       facts: [],
       chat: []
     },
@@ -37,7 +35,7 @@ const topics = [
       id: "science",
       title: "Science",
       category: "science",
-      image: "https://images.unsplash.com/photo-1532094349884-543bc11b234d?q=80&w=1200&auto=format&fit=crop",
+      image: "https://plus.unsplash.com/premium_photo-1661432575489-b0400f4fea58?q=80&w=1772&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
       facts: [],
       chat: []
     },
@@ -45,7 +43,7 @@ const topics = [
       id: "sports",
       title: "Sports",
       category: "sports",
-      image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=1200&auto=format&fit=crop",
+      image: "https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?q=80&w=1769&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
       facts: [],
       chat: []
     },
@@ -53,7 +51,7 @@ const topics = [
       id: "technology",
       title: "Technology",
       category: "technology",
-      image: "https://images.unsplash.com/photo-1518709268805-4e9042af2176?q=80&w=1200&auto=format&fit=crop",
+      image: "https://plus.unsplash.com/premium_photo-1661963212517-830bbb7d76fc?q=80&w=1686&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
       facts: [],
       chat: []
     }
