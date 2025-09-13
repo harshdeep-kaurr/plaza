@@ -289,7 +289,7 @@ function SubPlaza() {
         setArticles([]);
         setMessages([{
           id: 1,
-          speaker: "Error",
+          speaker: "System",
           side: "left",
           text: `Error loading subtopic: ${error.message}`,
           timestamp: new Date().toISOString()
@@ -363,7 +363,7 @@ function SubPlaza() {
       // Fallback response
       const fallbackResponse = {
         id: Date.now() + 1,
-        speaker: "News Analyst",
+        speaker: "System",
         side: "left",
         text: "I'm having trouble processing your message right now. Please try again.",
         timestamp: new Date().toISOString()
@@ -495,35 +495,39 @@ function SubPlaza() {
                     borderColor: m.side === "left" ? biasShading.borderColor : "#e6e4e0"
                   }}
                 >
-                  <div className="font-bold mb-1">{m.speaker}</div>
-                  <p className="text-[color:var(--ink-light)]">{m.text}</p>
-                  {m.source_url && (
-                    <div className="mt-2 text-xs text-[color:var(--ink-light)] group relative">
-                      <span className="underline cursor-pointer hover:text-blue-600 transition-colors">
-                        Source
-                      </span>
+                  <div className="font-bold mb-1 group relative cursor-pointer">
+                    {m.speaker}
+                    {(m.news_source || m.source_url) && (
                       <div className="absolute bottom-full left-0 mb-2 w-80 bg-white border border-gray-300 rounded-lg shadow-lg p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
                         <div className="text-sm font-semibold text-gray-800 mb-2">
-                          {m.speaker}
+                          {m.news_source || m.speaker}
                         </div>
-                        <div className="text-xs text-gray-600 mb-2">
-                          <a 
-                            href={m.source_url} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="text-blue-600 hover:text-blue-800 underline"
-                          >
-                            {m.source_url}
-                          </a>
-                        </div>
+                        {m.news_source_url && (
+                          <div className="text-xs text-gray-600 mb-2">
+                            <a 
+                              href={m.news_source_url} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="text-blue-600 hover:text-blue-800 underline"
+                            >
+                              {m.news_source_url}
+                            </a>
+                          </div>
+                        )}
                         {m.quote && (
                           <div className="text-xs text-gray-700 italic border-l-2 border-gray-300 pl-2">
                             "{m.quote}"
                           </div>
                         )}
+                        {!m.quote && m.news_source && (
+                          <div className="text-xs text-gray-500 italic">
+                            News source: {m.news_source}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  <p className="text-[color:var(--ink-light)]">{m.text}</p>
                 </div>
               </div>
             );

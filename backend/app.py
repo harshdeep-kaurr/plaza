@@ -57,6 +57,14 @@ except Exception as e:
 # Initialize sentiment analyzer
 sia = SentimentIntensityAnalyzer()
 
+# Random names for conversation participants
+RANDOM_NAMES = [
+    "Alex", "Jordan", "Casey", "Riley", "Morgan", "Taylor", "Avery", "Quinn",
+    "Sage", "River", "Dakota", "Phoenix", "Blake", "Cameron", "Drew", "Emery",
+    "Finley", "Hayden", "Jamie", "Kendall", "Logan", "Parker", "Reese", "Sage",
+    "Skyler", "Tatum", "Val", "Wren", "Zion", "Ari", "Briar", "Cedar"
+]
+
 # Personas for conversation generation
 PERSONAS = {
     "Dr. Sarah Chen (Nature)": {
@@ -405,6 +413,11 @@ def extract_subtopics(articles, topic_name):
     
     return subtopics[:8]  # Return top 8 subtopics
 
+def get_random_name():
+    """Get a random name for conversation participants."""
+    import random
+    return random.choice(RANDOM_NAMES)
+
 def clean_json_string(json_str):
     """Clean JSON string to remove control characters and fix common issues."""
     import re
@@ -535,17 +548,28 @@ Return ONLY the JSON array, no other text.
                 
                 # Validate and clean up the conversation
                 cleaned_conversation = []
+                used_names = set()
                 for i, msg in enumerate(conversation):
                     if isinstance(msg, dict) and 'speaker' in msg and 'text' in msg:
                         # Alternate between left and right sides for AI messages
                         side = 'right' if i % 2 == 1 else 'left'
+                        
+                        # Get a random name that hasn't been used yet
+                        original_speaker = str(msg.get('speaker', 'Unknown'))
+                        random_name = get_random_name()
+                        while random_name in used_names:
+                            random_name = get_random_name()
+                        used_names.add(random_name)
+                        
                         cleaned_msg = {
-                            'speaker': str(msg.get('speaker', 'Unknown')),
+                            'speaker': random_name,
                             'side': side,
                             'text': str(msg.get('text', '')),
                             'timestamp': msg.get('timestamp', datetime.now().isoformat()),
                             'source_url': str(msg.get('source_url', '')),
-                            'quote': str(msg.get('quote', ''))
+                            'quote': str(msg.get('quote', '')),
+                            'news_source': original_speaker,  # Store original news source
+                            'news_source_url': str(msg.get('source_url', ''))
                         }
                         cleaned_conversation.append(cleaned_msg)
                 
@@ -569,23 +593,32 @@ Return ONLY the JSON array, no other text.
                     ]
                     
                     conversation = []
+                    used_names = set()
                     for pattern in message_patterns:
                         matches = re.findall(pattern, response_text, re.IGNORECASE | re.DOTALL)
                         if matches:
                             for i, match in enumerate(matches):
                                 if len(match) >= 2:
-                                    speaker = match[0].strip()
+                                    original_speaker = match[0].strip()
                                     text = match[1].strip()
-                                    if len(speaker) > 1 and len(text) > 5:
+                                    if len(original_speaker) > 1 and len(text) > 5:
+                                        # Get a random name that hasn't been used yet
+                                        random_name = get_random_name()
+                                        while random_name in used_names:
+                                            random_name = get_random_name()
+                                        used_names.add(random_name)
+                                        
                                         # Alternate between left and right sides
                                         side = 'right' if i % 2 == 1 else 'left'
                                         conversation.append({
-                                            "speaker": speaker,
+                                            "speaker": random_name,
                                             "side": side,
                                             "text": text,
                                             "timestamp": datetime.now().isoformat(),
                                             "source_url": "",
-                                            "quote": ""
+                                            "quote": "",
+                                            "news_source": original_speaker,
+                                            "news_source_url": ""
                                         })
                             if conversation:
                                 break
@@ -640,18 +673,27 @@ def create_fallback_conversation(response_text, articles, style="casual"):
         for i in range(min(len(speakers), len(texts))):
             matches.append((speakers[i], texts[i]))
     
+    used_names = set()
     for i, (speaker, text) in enumerate(matches):
-        speaker = speaker.strip().replace('{', '').replace('}', '')
+        original_speaker = speaker.strip().replace('{', '').replace('}', '')
         text = text.strip().replace('{', '').replace('}', '')
         
-        if len(speaker) > 2 and len(text) > 5:
+        if len(original_speaker) > 2 and len(text) > 5:
+            # Get a random name that hasn't been used yet
+            random_name = get_random_name()
+            while random_name in used_names:
+                random_name = get_random_name()
+            used_names.add(random_name)
+            
             # Alternate between left and right sides
             side = 'right' if i % 2 == 1 else 'left'
             conversation.append({
-                "speaker": speaker,
+                "speaker": random_name,
                 "side": side, 
                 "text": text,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
+                "news_source": original_speaker,
+                "news_source_url": ""
             })
     
     # If we didn't get enough messages, add some basic ones
@@ -699,17 +741,26 @@ def create_basic_conversation(articles, topic, style="casual"):
             "This is pretty exciting news"
         ]
     
+    used_names = set()
     for i, source in enumerate(sources[:4]):
         if i < len(responses):
+            # Get a random name that hasn't been used yet
+            random_name = get_random_name()
+            while random_name in used_names:
+                random_name = get_random_name()
+            used_names.add(random_name)
+            
             # Alternate between left and right sides
             side = 'right' if i % 2 == 1 else 'left'
             conversation.append({
-                "speaker": source,
+                "speaker": random_name,
                 "side": side,
                 "text": responses[i],
                 "timestamp": datetime.now().isoformat(),
                 "source_url": "",
-                "quote": ""
+                "quote": "",
+                "news_source": source,
+                "news_source_url": ""
             })
     
     return conversation
@@ -1012,12 +1063,14 @@ def chat_endpoint():
         return jsonify({
             'success': True,
             'response': {
-                'speaker': selected_persona,
+                'speaker': get_random_name(),
                 'side': 'left',
                 'text': ai_response,
                 'timestamp': datetime.now().isoformat(),
                 'source_url': source_url,
-                'quote': quote
+                'quote': quote,
+                'news_source': selected_persona,
+                'news_source_url': source_url
             }
         })
         
